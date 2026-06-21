@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "TeamLens",
-    "slug": "TeamLens",
+    "slug": "teamlens",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -39,6 +39,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "dd7ed27c-6c86-448d-86c6-d67641d80594"
+      }
+    },
+    "owner": "abhijeetsingh200"
   }
 }
