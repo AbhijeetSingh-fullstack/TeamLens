@@ -78,35 +78,32 @@ export default function JoinTeamScreen() {
       const selectedRole = availableRoles.find(r => r.id === selectedRoleId);
 
       // Insert member into team_members table
+      // Note: This will likely fail with a user_id constraint error since we don't have auth yet.
       const { error: joinError } = await supabase
         .from('team_members')
         .insert([{
           team_id: teamInfo.id,
           member_name: memberName,
           role_id: selectedRoleId,
+          status: 'pending'
         }]);
 
       if (joinError) {
-        // Fallback for different column names if they used user_name etc
-        if (joinError.message.includes('column')) {
-            console.warn("Column mismatch warning:", joinError.message);
-        }
-        throw joinError;
+        throw new Error(joinError.message);
       }
 
-      // Route to new onboarding screen for the member
+      // Route to pending approval screen
       router.push({
-        pathname: '/member-onboarding',
+        pathname: '/pending-approval',
         params: { 
           teamName: teamInfo.team_name,
           memberName: memberName,
           roleName: selectedRole?.role_name || 'Member'
         }
       });
-      
+      // Do not set isJoining to false here, to avoid updating an unmounted component
     } catch (error: any) {
       alert('Failed to join team: ' + error.message);
-    } finally {
       setIsJoining(false);
     }
   };
