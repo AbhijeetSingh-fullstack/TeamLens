@@ -57,7 +57,10 @@ export default function WelcomeScreen() {
           </TouchableOpacity>
 
           {/* Join Team Card */}
-          <TouchableOpacity className="w-full bg-white/70 rounded-[32px] p-6 border border-slate-200 shadow-sm active:bg-white">
+          <TouchableOpacity 
+            onPress={() => router.push('/join-team')}
+            className="w-full bg-white/70 rounded-[32px] p-6 border border-slate-200 shadow-sm active:bg-white"
+          >
             <View className="w-14 h-14 bg-indigo-50 rounded-2xl items-center justify-center mb-4 border border-indigo-100">
               <Text className="text-indigo-600 text-2xl">➡️</Text>
             </View>
