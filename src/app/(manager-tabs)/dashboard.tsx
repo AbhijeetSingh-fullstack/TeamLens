@@ -27,6 +27,9 @@ export default function ManagerDashboard() {
   const [pendingMembers, setPendingMembers] = useState<Member[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
   const [teamId, setTeamId] = useState<string | null>(null);
+  const [isLocked, setIsLocked] = useState(false);
+  const [displayTeamCode, setDisplayTeamCode] = useState(teamCode || '');
+  const [displayTeamName, setDisplayTeamName] = useState(teamName || '');
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [showManageTeam, setShowManageTeam] = useState(false);
@@ -34,19 +37,38 @@ export default function ManagerDashboard() {
 
   // Poll for new members and roles
   useEffect(() => {
-    if (!teamCode) return;
-
     const fetchData = async () => {
       try {
+        let codeToFetch = displayTeamCode || teamCode;
+
+        if (!codeToFetch) {
+          // Fallback for development hot reloads when URL params are lost
+          const { data: latestTeam } = await supabase
+            .from('teams')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          if (latestTeam) {
+            codeToFetch = latestTeam.team_code;
+            setDisplayTeamCode(latestTeam.team_code);
+            setDisplayTeamName(latestTeam.team_name);
+          } else {
+            return;
+          }
+        }
+
         // First get team ID using the code
         const { data: teamData } = await supabase
           .from('teams')
-          .select('id')
-          .eq('team_code', teamCode)
+          .select('id, is_locked')
+          .eq('team_code', codeToFetch)
           .single();
 
         if (teamData) {
           setTeamId(teamData.id);
+          setIsLocked(teamData.is_locked || false);
 
           const { data: membersData } = await supabase
             .from('team_members')
@@ -144,6 +166,19 @@ export default function ManagerDashboard() {
     }
   };
 
+  const handleToggleLock = async () => {
+    if (!teamId) return;
+    try {
+      const newStatus = !isLocked;
+      setIsLocked(newStatus); // optimistic update
+      await supabase.from('teams').update({ is_locked: newStatus }).eq('id', teamId);
+    } catch (e) {
+      alert("Failed to toggle team lock status");
+      setIsLocked(!isLocked); // revert on error
+    }
+  };
+
+
   return (
     <SafeAreaView className="flex-1 bg-[#F8F9FE]">
       <StatusBar barStyle="dark-content" />
@@ -171,16 +206,25 @@ export default function ManagerDashboard() {
 
         {/* Hero Card */}
         <View className="bg-white rounded-[24px] p-6 shadow-sm border border-slate-100 mb-5">
-          <Text className="text-2xl font-bold text-slate-800 mb-2">{teamName || 'Product Design Team'}</Text>
+          <Text className="text-2xl font-bold text-slate-800 mb-2">{displayTeamName || 'Product Design Team'}</Text>
           <Text className="text-slate-500 leading-5 mb-6 text-sm">
             Orchestrating visual excellence and user-centric flows across all TeamLens flagship products.
           </Text>
 
-          <View className="bg-[#F4F5FA] rounded-xl flex-row items-center justify-between p-4 mb-6 border border-indigo-50">
-            <Text className="text-indigo-400 font-bold text-xs uppercase tracking-wider">Invite Code</Text>
-            <View className="flex-row items-center gap-3">
-              <Text className="text-indigo-600 font-bold text-base tracking-widest">{teamCode || 'WP-829X-92'}</Text>
-              <Feather name="copy" size={16} color="#94a3b8" />
+          <View className="flex-row gap-3 mb-6">
+            <TouchableOpacity 
+              onPress={handleToggleLock}
+              className={`w-14 items-center justify-center rounded-xl border ${isLocked ? 'bg-red-50 border-red-100' : 'bg-emerald-50 border-emerald-100'}`}
+            >
+              <Feather name={isLocked ? "lock" : "unlock"} size={20} color={isLocked ? "#ef4444" : "#10b981"} />
+            </TouchableOpacity>
+            
+            <View className="flex-1 bg-[#F4F5FA] rounded-xl flex-row items-center justify-between p-4 border border-indigo-50">
+              <Text className="text-indigo-400 font-bold text-xs uppercase tracking-wider">Invite Code</Text>
+              <View className="flex-row items-center gap-3">
+                <Text className="text-indigo-600 font-bold text-base tracking-widest">{displayTeamCode || 'WP-829X-92'}</Text>
+                <Feather name="copy" size={16} color="#94a3b8" />
+              </View>
             </View>
           </View>
 
@@ -260,7 +304,7 @@ export default function ManagerDashboard() {
               </View>
               <Text className="text-slate-500 font-medium mb-1">No members yet</Text>
               <Text className="text-slate-400 text-xs text-center px-6">
-                Share your invite code {teamCode ? `(${teamCode})` : ''} with your team so they can join your workspace.
+                Share your invite code {displayTeamCode ? `(${displayTeamCode})` : ''} with your team so they can join your workspace.
               </Text>
             </View>
           ) : (

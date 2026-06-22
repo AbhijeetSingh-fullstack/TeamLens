@@ -49,6 +49,10 @@ export default function JoinTeamScreen() {
         throw new Error("Invalid team code. Please check and try again.");
       }
 
+      if (teamData.is_locked) {
+        throw new Error("This team is currently locked and not accepting new applications.");
+      }
+
       setTeamInfo(teamData);
 
       // Find the roles for this team
