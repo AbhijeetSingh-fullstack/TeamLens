@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, ScrollView, Image, StatusBar, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Image, StatusBar, Modal, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
@@ -25,13 +25,18 @@ export default function ManagerDashboard() {
 
   const [members, setMembers] = useState<Member[]>([]);
   const [pendingMembers, setPendingMembers] = useState<Member[]>([]);
-  const [showNotifications, setShowNotifications] = useState(false);
+  const [roles, setRoles] = useState<any[]>([]);
+  const [teamId, setTeamId] = useState<string | null>(null);
 
-  // Poll for new members
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showManageTeam, setShowManageTeam] = useState(false);
+  const [newRoleName, setNewRoleName] = useState('');
+
+  // Poll for new members and roles
   useEffect(() => {
     if (!teamCode) return;
 
-    const fetchMembers = async () => {
+    const fetchData = async () => {
       try {
         // First get team ID using the code
         const { data: teamData } = await supabase
@@ -41,6 +46,8 @@ export default function ManagerDashboard() {
           .single();
 
         if (teamData) {
+          setTeamId(teamData.id);
+
           const { data: membersData } = await supabase
             .from('team_members')
             .select('*, roles(role_name)')
@@ -51,14 +58,21 @@ export default function ManagerDashboard() {
             setPendingMembers(membersData.filter(m => m.status === 'pending'));
             setStats(prev => ({ ...prev, activeMembers: 1 + membersData.filter(m => m.status === 'approved').length }));
           }
+
+          const { data: rolesData } = await supabase
+            .from('roles')
+            .select('*')
+            .eq('team_id', teamData.id);
+          
+          if (rolesData) setRoles(rolesData);
         }
       } catch (error) {
-        console.log('Error fetching members:', error);
+        console.log('Error fetching data:', error);
       }
     };
 
-    fetchMembers();
-    const interval = setInterval(fetchMembers, 3000);
+    fetchData();
+    const interval = setInterval(fetchData, 3000);
     return () => clearInterval(interval);
   }, [teamCode]);
 
@@ -85,6 +99,48 @@ export default function ManagerDashboard() {
       setPendingMembers(prev => prev.filter(m => m.id !== memberId));
     } catch (e) {
       alert("Failed to decline");
+    }
+  };
+
+  const handleRemoveMember = async (memberId: string) => {
+    try {
+      await supabase.from('team_members').delete().eq('id', memberId);
+      setMembers(prev => prev.filter(m => m.id !== memberId));
+    } catch (e) {
+      alert("Failed to remove member");
+    }
+  };
+
+  const handleChangeRole = async (memberId: string, roleId: string) => {
+    try {
+      await supabase.from('team_members').update({ role_id: roleId }).eq('id', memberId);
+      // Let the polling catch the UI update
+    } catch (e) {
+      alert("Failed to change role");
+    }
+  };
+
+  const handleAddRole = async () => {
+    if (!newRoleName.trim() || !teamId) return;
+    try {
+      await supabase.from('roles').insert([{ team_id: teamId, role_name: newRoleName.trim() }]);
+      setNewRoleName('');
+    } catch (e) {
+      alert("Failed to add role");
+    }
+  };
+
+  const handleDeleteRole = async (roleId: string) => {
+    const isUsed = members.some(m => m.role_id === roleId);
+    if (isUsed) {
+      alert("Cannot delete a role that is currently assigned to a member.");
+      return;
+    }
+    try {
+      await supabase.from('roles').delete().eq('id', roleId);
+      setRoles(prev => prev.filter(r => r.id !== roleId));
+    } catch (e) {
+      alert("Failed to delete role");
     }
   };
 
@@ -133,9 +189,12 @@ export default function ManagerDashboard() {
               <Feather name="user-plus" size={16} color="white" />
               <Text className="text-white font-bold text-sm">Invite More</Text>
             </TouchableOpacity>
-            <TouchableOpacity className="flex-1 bg-white border border-slate-200 py-3.5 rounded-xl flex-row items-center justify-center gap-2 active:bg-slate-50">
+            <TouchableOpacity 
+              onPress={() => setShowManageTeam(true)}
+              className="flex-1 bg-white border border-slate-200 py-3.5 rounded-xl flex-row items-center justify-center gap-2 active:bg-slate-50"
+            >
               <Feather name="settings" size={16} color="#64748b" />
-              <Text className="text-slate-700 font-medium text-sm">Manage Roles</Text>
+              <Text className="text-slate-700 font-medium text-sm">Manage Team</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -183,7 +242,7 @@ export default function ManagerDashboard() {
         {/* Dynamic Team Members List */}
         <View className="flex-row items-center justify-between mb-4 mt-2">
           <Text className="text-slate-800 font-bold text-base">Team Members</Text>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => setShowManageTeam(true)}>
             <Text className="text-indigo-600 text-sm font-medium">View All Directory</Text>
           </TouchableOpacity>
         </View>
@@ -270,6 +329,92 @@ export default function ManagerDashboard() {
               </ScrollView>
             )}
           </View>
+        </View>
+      </Modal>
+
+      {/* Manage Team Modal */}
+      <Modal visible={showManageTeam} animationType="slide" transparent={true}>
+        <View className="flex-1 bg-[#F8F9FE] pt-12">
+          <View className="flex-row justify-between items-center px-6 mb-6">
+            <Text className="text-3xl font-extrabold text-slate-800">Manage Team</Text>
+            <TouchableOpacity onPress={() => setShowManageTeam(false)} className="w-10 h-10 bg-white shadow-sm border border-slate-200 rounded-full items-center justify-center">
+              <Feather name="x" size={20} color="#475569" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView className="flex-1 px-6" showsVerticalScrollIndicator={false}>
+            {/* Roles Section */}
+            <View className="bg-white rounded-[20px] p-5 shadow-sm border border-slate-100 mb-6">
+              <Text className="text-lg font-bold text-slate-800 mb-4">Team Roles</Text>
+              
+              <View className="flex-row gap-2 mb-4">
+                <TextInput
+                  value={newRoleName}
+                  onChangeText={setNewRoleName}
+                  placeholder="New Role Name"
+                  className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800"
+                />
+                <TouchableOpacity 
+                  onPress={handleAddRole}
+                  className="bg-indigo-600 px-5 rounded-xl items-center justify-center"
+                >
+                  <Text className="text-white font-bold">Add</Text>
+                </TouchableOpacity>
+              </View>
+
+              {roles.map(role => (
+                <View key={role.id} className="flex-row justify-between items-center py-3 border-b border-slate-50">
+                  <Text className="text-slate-700 font-medium">{role.role_name}</Text>
+                  <TouchableOpacity onPress={() => handleDeleteRole(role.id)} className="w-8 h-8 items-center justify-center bg-red-50 rounded-full">
+                    <Feather name="trash-2" size={14} color="#ef4444" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+
+            {/* Members Section */}
+            <View className="bg-white rounded-[20px] p-5 shadow-sm border border-slate-100 mb-10">
+              <Text className="text-lg font-bold text-slate-800 mb-4">Team Members</Text>
+              
+              {members.length === 0 ? (
+                <Text className="text-slate-500 text-center py-4">No active members.</Text>
+              ) : (
+                members.map((member, index) => (
+                  <View key={member.id} className={`py-4 ${index !== members.length - 1 ? 'border-b border-slate-100' : ''}`}>
+                    <View className="flex-row justify-between items-center mb-3">
+                      <View className="flex-row items-center gap-3">
+                        <View className="w-10 h-10 rounded-full bg-indigo-100 items-center justify-center">
+                          <Text className="text-indigo-600 font-bold text-xs">{member.member_name.substring(0,2).toUpperCase()}</Text>
+                        </View>
+                        <Text className="text-slate-800 font-bold">{member.member_name}</Text>
+                      </View>
+                      
+                      <TouchableOpacity 
+                        onPress={() => handleRemoveMember(member.id)}
+                        className="bg-red-50 px-3 py-1.5 rounded-lg flex-row items-center gap-1 border border-red-100"
+                      >
+                        <Feather name="user-minus" size={12} color="#ef4444" />
+                        <Text className="text-red-600 text-xs font-bold">Remove</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    <Text className="text-slate-400 text-xs uppercase tracking-wider font-bold mb-2">Change Role:</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-2">
+                      {roles.map(role => (
+                        <TouchableOpacity
+                          key={role.id}
+                          onPress={() => handleChangeRole(member.id, role.id)}
+                          className={`px-4 py-2 rounded-xl border ${member.role_id === role.id ? 'bg-indigo-50 border-indigo-200' : 'bg-slate-50 border-slate-200'}`}
+                        >
+                          <Text className={`${member.role_id === role.id ? 'text-indigo-600 font-bold' : 'text-slate-600'}`}>{role.role_name}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                ))
+              )}
+            </View>
+          </ScrollView>
         </View>
       </Modal>
 

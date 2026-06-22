@@ -14,7 +14,7 @@ export default function PendingApprovalScreen() {
       try {
         const { data, error } = await supabase
           .from('team_members')
-          .select('status')
+          .select('id, team_id, status')
           .eq('member_name', memberName)
           .eq('status', 'approved')
           .single();
@@ -22,7 +22,7 @@ export default function PendingApprovalScreen() {
         if (data && data.status === 'approved') {
           router.replace({
             pathname: '/(member-tabs)/dashboard',
-            params: { teamName, memberName, roleName }
+            params: { teamName, memberName, roleName, memberId: data.id, teamId: data.team_id }
           });
         }
       } catch (err) {
