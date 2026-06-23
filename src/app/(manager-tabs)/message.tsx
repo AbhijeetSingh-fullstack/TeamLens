@@ -5,41 +5,48 @@ import { Feather } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../utils/supabase';
 
-export default function MemberMessageScreen() {
+export default function ManagerMessageScreen() {
   const router = useRouter();
-  const { teamName, memberName, memberId, teamId } = useGlobalSearchParams<{ 
-    teamName: string, 
-    memberName: string, 
-    memberId: string,
-    teamId: string
-  }>();
+  const { teamCode } = useGlobalSearchParams<{ teamCode: string }>();
 
+  const [teamData, setTeamData] = useState<any>(null);
   const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchMembers = async () => {
-      if (!teamId) return;
-      try {
-        const { data, error } = await supabase
-          .from('team_members')
-          .select('*, roles(role_name)')
-          .eq('team_id', teamId)
-          .eq('status', 'approved')
-          .neq('id', memberId); // Exclude self
-          
-        if (!error && data) {
-          setMembers(data);
-        }
-      } catch (e) {
-        console.log('Error fetching members:', e);
-      } finally {
-        setLoading(false);
+    const fetchTeam = async () => {
+      if (!teamCode) return;
+      const { data } = await supabase
+        .from('teams')
+        .select('*')
+        .eq('team_code', teamCode)
+        .single();
+        
+      if (data) {
+        setTeamData(data);
+        fetchMembers(data.id);
       }
     };
-    
-    fetchMembers();
-  }, [teamId, memberId]);
+    fetchTeam();
+  }, [teamCode]);
+
+  const fetchMembers = async (teamId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('team_members')
+        .select('*, roles(role_name)')
+        .eq('team_id', teamId)
+        .eq('status', 'approved');
+        
+      if (!error && data) {
+        setMembers(data);
+      }
+    } catch (e) {
+      console.log('Error fetching members:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleMessageMember = (member: any) => {
     router.push({
@@ -47,9 +54,9 @@ export default function MemberMessageScreen() {
       params: {
         id: member.id,
         receiverName: member.member_name,
-        teamId: teamId,
-        senderId: memberId,
-        senderName: memberName
+        teamId: teamData.id,
+        senderId: 'manager',
+        senderName: teamData.manager_name
       }
     });
   };
@@ -82,7 +89,7 @@ export default function MemberMessageScreen() {
       <View className="px-5 py-4 border-b border-slate-200 bg-white flex-row items-center justify-between z-10">
         <View>
           <Text className="text-xl font-bold text-slate-800">Messages</Text>
-          <Text className="text-slate-500 text-xs font-medium">{teamName}</Text>
+          <Text className="text-slate-500 text-xs font-medium">{teamData?.team_name || 'Loading...'}</Text>
         </View>
         <View className="bg-indigo-50 w-10 h-10 rounded-full items-center justify-center border border-indigo-100">
           <Feather name="search" size={18} color="#4f46e5" />
@@ -109,7 +116,7 @@ export default function MemberMessageScreen() {
               <View className="w-16 h-16 bg-slate-100 rounded-full items-center justify-center mb-4">
                 <Feather name="users" size={24} color="#94a3b8" />
               </View>
-              <Text className="text-slate-500 font-medium">No other team members yet.</Text>
+              <Text className="text-slate-500 font-medium">No team members yet.</Text>
             </View>
           }
         />
