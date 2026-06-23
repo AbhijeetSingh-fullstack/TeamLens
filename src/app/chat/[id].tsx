@@ -5,6 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Feather } from '@expo/vector-icons';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../utils/supabase';
+import { decode } from 'base64-arraybuffer';
 
 type Message = {
   id: string;
@@ -29,6 +30,7 @@ export default function ChatScreen() {
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedImageBase64, setSelectedImageBase64] = useState<string | null>(null);
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
@@ -85,10 +87,12 @@ export default function ChatScreen() {
         mediaTypes: ['images'],
         allowsEditing: true,
         quality: 0.7,
+        base64: true,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         setSelectedImage(result.assets[0].uri);
+        setSelectedImageBase64(result.assets[0].base64 || null);
       }
     } catch (e: any) {
       alert(e.message || "An error occurred selecting image.");
@@ -101,26 +105,34 @@ export default function ChatScreen() {
     setIsSending(true);
     const contentText = newMessage.trim();
     const imageUri = selectedImage;
+    const imageBase64 = selectedImageBase64;
     
     setNewMessage('');
     setSelectedImage(null);
+    setSelectedImageBase64(null);
     
     try {
       let finalContent = contentText;
 
       if (imageUri) {
-        // Convert to blob
-        const response = await fetch(imageUri);
-        const blob = await response.blob();
-        
-        let ext = imageUri.split('.').pop();
-        if (!ext || ext.length > 4 || ext.includes('/')) {
+        let ext = imageUri.split('.').pop()?.toLowerCase() || 'jpg';
+        if (ext.length > 4 || ext.includes('/')) {
            ext = 'jpg';
         }
+        const fileExt = ext === 'png' ? 'png' : 'jpeg';
         const fileName = `${Date.now()}_${Math.floor(Math.random() * 1000)}.${ext}`;
+        let bucketName = 'FIlEs';
+        let uploadResult;
 
-        let bucketName = 'FIlEs'; // User's bucket
-        let uploadResult = await supabase.storage.from(bucketName).upload(fileName, blob, { contentType: `image/${ext}` });
+        if (imageUri.startsWith('blob:') || Platform.OS === 'web') {
+           const response = await fetch(imageUri);
+           const blob = await response.blob();
+           uploadResult = await supabase.storage.from(bucketName).upload(fileName, blob, { contentType: `image/${fileExt}` });
+        } else {
+           if (!imageBase64) throw new Error("Image data missing");
+           const arrayBuffer = decode(imageBase64);
+           uploadResult = await supabase.storage.from(bucketName).upload(fileName, arrayBuffer, { contentType: `image/${fileExt}` });
+        }
         
         if (uploadResult.error) {
            throw new Error(`Upload Failed: ${uploadResult.error.message}`);
@@ -271,7 +283,7 @@ export default function ChatScreen() {
               <View className="relative rounded-xl overflow-hidden shadow-sm border border-slate-200" style={{ width: 80, height: 80 }}>
                 <Image source={{ uri: selectedImage }} style={{ width: 80, height: 80 }} resizeMode="cover" />
                 <TouchableOpacity 
-                  onPress={() => setSelectedImage(null)}
+                  onPress={() => { setSelectedImage(null); setSelectedImageBase64(null); }}
                   className="absolute top-1 right-1 bg-black/60 rounded-full w-6 h-6 items-center justify-center"
                   style={{ zIndex: 50, elevation: 5 }}
                 >
