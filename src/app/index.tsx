@@ -74,6 +74,24 @@ export default function WelcomeScreen() {
             </View>
           </TouchableOpacity>
 
+          {/* Test Login Card */}
+          <TouchableOpacity 
+            onPress={() => router.push('/test-login')}
+            className="w-full bg-white/70 rounded-[32px] p-6 border border-slate-200 shadow-sm active:bg-white"
+          >
+            <View className="w-14 h-14 bg-emerald-50 rounded-2xl items-center justify-center mb-4 border border-emerald-100">
+              <Text className="text-emerald-600 text-2xl">🔑</Text>
+            </View>
+            <Text className="text-2xl font-bold text-slate-900 mb-2">Test Login</Text>
+            <Text className="text-slate-500 text-sm leading-6 mb-5">
+              Already approved? Enter your team code to instantly log back in as an existing employee.
+            </Text>
+            <View className="flex-row items-center gap-2">
+              <Text className="text-emerald-700 font-bold text-base">Login Now</Text>
+              <Text className="text-emerald-700 font-bold text-lg">→</Text>
+            </View>
+          </TouchableOpacity>
+
         </View>
 
         {/* Footer Area */}

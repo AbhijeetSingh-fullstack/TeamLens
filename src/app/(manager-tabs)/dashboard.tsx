@@ -39,7 +39,7 @@ export default function ManagerDashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        let codeToFetch = displayTeamCode || teamCode;
+        let codeToFetch = teamCode || displayTeamCode;
 
         if (!codeToFetch) {
           // Fallback for development hot reloads when URL params are lost
@@ -62,13 +62,15 @@ export default function ManagerDashboard() {
         // First get team ID using the code
         const { data: teamData } = await supabase
           .from('teams')
-          .select('id, is_locked')
+          .select('*')
           .eq('team_code', codeToFetch)
           .single();
 
         if (teamData) {
           setTeamId(teamData.id);
           setIsLocked(teamData.is_locked || false);
+          setDisplayTeamCode(teamData.team_code);
+          setDisplayTeamName(teamData.team_name);
 
           const { data: membersData } = await supabase
             .from('team_members')
@@ -78,7 +80,23 @@ export default function ManagerDashboard() {
           if (membersData) {
             setMembers(membersData.filter(m => m.status === 'approved' || !m.status));
             setPendingMembers(membersData.filter(m => m.status === 'pending'));
-            setStats(prev => ({ ...prev, activeMembers: 1 + membersData.filter(m => m.status === 'approved').length }));
+
+            // Fetch tasks to calculate dynamic stats
+            const { data: tasksData } = await supabase
+              .from('tasks')
+              .select('status')
+              .eq('team_id', teamData.id);
+
+            const openTasksCount = tasksData?.filter(t => t.status === 'open').length || 0;
+            const completedTasksCount = tasksData?.filter(t => t.status === 'completed').length || 0;
+            const totalTasks = tasksData?.length || 0;
+            const pScore = totalTasks > 0 ? Math.round((completedTasksCount / totalTasks) * 100) : 0;
+
+            setStats({
+              activeMembers: 1 + membersData.filter(m => m.status === 'approved').length,
+              openTasks: openTasksCount,
+              productivityScore: pScore
+            });
           }
 
           const { data: rolesData } = await supabase
