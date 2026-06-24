@@ -14,6 +14,32 @@ export default function ManagerProjects() {
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [isModalVisible, setModalVisible] = useState(false);
 
+  const handleRequestRevision = async (assignmentId: string, revisionsCount: number, taskId: string) => {
+    try {
+      const { error } = await supabase
+        .from('task_assignments')
+        .update({ 
+          status: 'open', 
+          revisions_count: revisionsCount + 1,
+          completed_at: null,
+          submission_notes: null,
+          submission_image_url: null
+        })
+        .eq('id', assignmentId);
+        
+      if (error) throw error;
+      
+      // Also update parent task to open so it goes back to active tasks
+      await supabase.from('tasks').update({ status: 'open', completed_at: null }).eq('id', taskId);
+      
+      setModalVisible(false);
+      fetchArchivedTasks();
+      alert("Revision requested! Task sent back to employee.");
+    } catch (e: any) {
+      alert("Failed to request revision: " + e.message);
+    }
+  };
+
   const fetchArchivedTasks = async () => {
     if (!teamCode) return;
     try {
@@ -168,7 +194,7 @@ export default function ManagerProjects() {
                   )}
 
                   {assign.submission_image_url && (
-                    <View>
+                    <View className="mb-4">
                       <Text className="text-slate-500 font-bold text-[10px] uppercase tracking-wider mb-2">Attached Evidence</Text>
                       <Image 
                         source={{ uri: assign.submission_image_url }} 
@@ -177,6 +203,14 @@ export default function ManagerProjects() {
                       />
                     </View>
                   )}
+
+                  <TouchableOpacity
+                    onPress={() => handleRequestRevision(assign.id, assign.revisions_count || 0, selectedTask.id)}
+                    className="mt-2 bg-red-50 border border-red-100 py-3 rounded-xl items-center flex-row justify-center gap-2"
+                  >
+                    <Feather name="refresh-ccw" size={16} color="#ef4444" />
+                    <Text className="text-red-500 font-bold">Request Revision (-1 pt)</Text>
+                  </TouchableOpacity>
                 </View>
               ))}
               <View className="h-10" />

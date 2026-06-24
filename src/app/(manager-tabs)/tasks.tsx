@@ -78,6 +78,8 @@ export default function ManagerTasks() {
 
   useEffect(() => {
     fetchTasksAndMembers();
+    const interval = setInterval(fetchTasksAndMembers, 5000);
+    return () => clearInterval(interval);
   }, [teamCode]);
 
   const addMember = (memberId: string) => {

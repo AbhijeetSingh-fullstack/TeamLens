@@ -28,10 +28,12 @@ export default function MemberTasks() {
         .select(`
           id,
           status,
+          created_at,
+          completed_at,
           specific_instructions,
           submission_notes,
           submission_image_url,
-          tasks (
+          tasks!inner (
             id,
             title,
             description,
@@ -42,9 +44,18 @@ export default function MemberTasks() {
           )
         `)
         .eq('member_id', memberId)
-        .order('tasks(due_date)', { ascending: true });
+        .order('created_at', { ascending: false });
 
-      if (data) setAssignments(data);
+      if (data) {
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).getTime();
+        const filtered = data.filter(a => {
+          if (a.status === 'completed' && a.completed_at) {
+            return new Date(a.completed_at).getTime() > oneDayAgo;
+          }
+          return true;
+        });
+        setAssignments(filtered);
+      }
     } catch (e) {
       console.log('Error fetching assigned tasks:', e);
     } finally {

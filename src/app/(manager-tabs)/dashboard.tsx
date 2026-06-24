@@ -237,9 +237,10 @@ export default function ManagerDashboard() {
     try {
       const newStatus = !isLocked;
       setIsLocked(newStatus); // optimistic update
-      await supabase.from('teams').update({ is_locked: newStatus }).eq('id', teamId);
-    } catch (e) {
-      alert("Failed to toggle team lock status");
+      const { error } = await supabase.from('teams').update({ is_locked: newStatus }).eq('id', teamId);
+      if (error) throw error;
+    } catch (e: any) {
+      alert("Failed to toggle team lock status: " + e.message);
       setIsLocked(!isLocked); // revert on error
     }
   };
@@ -405,7 +406,7 @@ export default function ManagerDashboard() {
       {/* Notifications Modal */}
       <Modal visible={showNotifications} animationType="slide" transparent={true}>
         <View className="flex-1 bg-black/50 justify-end">
-          <View className="bg-white rounded-t-3xl min-h-[50%] p-6">
+          <View className="bg-white rounded-t-3xl p-6" style={{ height: '50%' }}>
             <View className="flex-row justify-between items-center mb-6">
               <Text className="text-2xl font-bold text-slate-800">Notifications</Text>
               <TouchableOpacity onPress={() => setShowNotifications(false)} className="w-8 h-8 bg-slate-100 rounded-full items-center justify-center">
