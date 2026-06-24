@@ -10,7 +10,6 @@ export default function ManagerAnalytics() {
   const [loading, setLoading] = useState(true);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [monthlyStats, setMonthlyStats] = useState({ assigned: 0, completed: 0 });
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -24,15 +23,13 @@ export default function ManagerAnalytics() {
 
   const fetchAnalytics = async () => {
     try {
-      setErrorMsg(null);
-      const { data: teamData, error: teamError } = await supabase.from('teams').select('id').eq('team_code', teamCode).single();
-      if (teamError) throw teamError;
+      const { data: teamData } = await supabase.from('teams').select('id').eq('team_code', teamCode).single();
       if (!teamData) return;
 
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
-      
+
       // The start of today (to only count tasks finished before today for points)
       const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
 
@@ -59,7 +56,7 @@ export default function ManagerAnalytics() {
 
       let assignedThisMonth = allTasks?.length || 0;
       let completedThisMonth = allTasks?.filter(t => t.status === 'completed').length || 0;
-      
+
       setMonthlyStats({ assigned: assignedThisMonth, completed: completedThisMonth });
 
       // Calculate Leaderboard
@@ -77,47 +74,32 @@ export default function ManagerAnalytics() {
           };
         }
 
-        // Calculate points in realtime for testing (removed < startOfToday restriction)
+        // 1. Deduct penalties immediately, regardless of completion status
+        let penalty = a.revisions_count || 0;
+        if (a.tasks?.category === 'Revision') penalty += 1;
+        pointsMap[memberId].points -= penalty;
+
+        // 2. Add positive points ONLY if completed
         if (a.status === 'completed' && a.completed_at && a.completed_at >= startOfMonth) {
-          const createdAt = new Date(a.tasks.created_at).getTime();
-          const dueDate = new Date(a.tasks.due_date).getTime();
-          const completedAt = new Date(a.completed_at).getTime();
-
-          const totalDuration = dueDate - createdAt;
-          const timeRemaining = dueDate - completedAt;
-
-          let earned = 0;
-          if (timeRemaining < 0) {
-            earned = -1; // Missed deadline
-          } else {
-            const percentRemaining = (timeRemaining / totalDuration) * 100;
-            if (percentRemaining >= 75) earned = 10;
-            else if (percentRemaining >= 50) earned = 7;
-            else if (percentRemaining >= 25) earned = 3;
-            else earned = 0;
+          if (a.tasks?.category !== 'Revision') {
+             pointsMap[memberId].points += 10;
           }
-
-          const revisions = a.revisions_count || 0;
-          earned -= revisions;
-
-          pointsMap[memberId].points += earned;
           pointsMap[memberId].tasksCompleted += 1;
         }
       });
 
       const sortedLeaderboard = Object.values(pointsMap).sort((a: any, b: any) => b.points - a.points);
       setLeaderboard(sortedLeaderboard);
-      setLoading(false);
-    } catch (e: any) {
-      console.log('Error fetching analytics:', e);
-      setErrorMsg(e.message);
+    } catch (e) {
+      console.log("Analytics Error:", e);
+    } finally {
       setLoading(false);
     }
   };
 
   const maxGraphValue = Math.max(monthlyStats.assigned, monthlyStats.completed, 1);
-  const assignedHeight = Math.max(20, (monthlyStats.assigned / maxGraphValue) * 120);
-  const completedHeight = Math.max(20, (monthlyStats.completed / maxGraphValue) * 120);
+  const assignedHeight = (monthlyStats.assigned / maxGraphValue) * 100;
+  const completedHeight = (monthlyStats.completed / maxGraphValue) * 100;
 
   return (
     <SafeAreaView className="flex-1 bg-[#F9F9FB]">
@@ -126,18 +108,11 @@ export default function ManagerAnalytics() {
         <Text className="text-slate-500 text-sm">Monthly team performance & leaderboard</Text>
       </View>
 
-      {errorMsg && (
-        <View className="m-5 p-4 bg-red-50 border border-red-200 rounded-xl">
-          <Text className="text-red-600 font-bold mb-1">Database Sync Error</Text>
-          <Text className="text-red-500 text-xs">{errorMsg}</Text>
-        </View>
-      )}
-
       {loading ? (
         <View className="flex-1 items-center justify-center"><ActivityIndicator color="#4f46e5" /></View>
       ) : (
         <ScrollView className="flex-1 px-5 pt-5" contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-          
+
           {/* Monthly Graph */}
           <View className="bg-white rounded-[24px] p-6 shadow-sm border border-slate-100 mb-8">
             <View className="flex-row items-center justify-between mb-6">
@@ -150,12 +125,12 @@ export default function ManagerAnalytics() {
             <View className="flex-row items-end justify-center h-48 gap-8 border-b border-slate-100 pb-2">
               <View className="items-center">
                 <Text className="text-slate-500 font-bold mb-2 text-xs">{monthlyStats.assigned}</Text>
-                <View className="w-16 bg-slate-200 rounded-t-xl" style={{ height: assignedHeight }} />
+                <View className="w-16 bg-slate-200 rounded-t-xl" style={{ height: `${assignedHeight}%`, minHeight: 20 }} />
                 <Text className="text-slate-600 font-medium mt-3 text-sm">Assigned</Text>
               </View>
               <View className="items-center">
                 <Text className="text-slate-500 font-bold mb-2 text-xs">{monthlyStats.completed}</Text>
-                <View className="w-16 bg-emerald-400 rounded-t-xl shadow-sm shadow-emerald-200" style={{ height: completedHeight }} />
+                <View className="w-16 bg-emerald-400 rounded-t-xl shadow-sm shadow-emerald-200" style={{ height: `${completedHeight}%`, minHeight: 20 }} />
                 <Text className="text-slate-600 font-medium mt-3 text-sm">Completed</Text>
               </View>
             </View>

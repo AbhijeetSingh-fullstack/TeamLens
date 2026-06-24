@@ -1,11 +1,11 @@
-import { View, Text, TouchableOpacity, FlatList, TextInput, ActivityIndicator, Modal, Image, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useState, useEffect } from 'react';
-import { supabase } from '../../utils/supabase';
-import { useGlobalSearchParams } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
 import { decode } from 'base64-arraybuffer';
+import * as ImagePicker from 'expo-image-picker';
+import { useGlobalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { supabase } from '../../utils/supabase';
 
 export default function MemberTasks() {
   const { memberId } = useGlobalSearchParams<{ memberId: string }>();
@@ -94,7 +94,7 @@ export default function MemberTasks() {
       Alert.alert("Error", "No assignment selected.");
       return;
     }
-    
+
     setIsSubmitting(true);
 
     try {
@@ -106,10 +106,10 @@ export default function MemberTasks() {
         const uriParts = submissionImage.uri.split('.');
         let ext = uriParts[uriParts.length - 1].split('?')[0].toLowerCase();
         if (ext === 'jpg') ext = 'jpeg';
-        
+
         const fileName = `${selectedAssignment.tasks.id}/${memberId}_${Date.now()}.${ext}`;
         const contentType = submissionImage.mimeType || `image/${ext}`;
-        
+
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('task-submissions')
           .upload(fileName, decode(submissionImage.base64), {
@@ -131,7 +131,7 @@ export default function MemberTasks() {
       const now = new Date().toISOString();
       const { error: assignError } = await supabase
         .from('task_assignments')
-        .update({ 
+        .update({
           status: 'completed',
           submission_notes: submissionNotes,
           submission_image_url: imageUrl,
@@ -161,7 +161,7 @@ export default function MemberTasks() {
           .from('tasks')
           .update({ status: 'completed', completed_at: now })
           .eq('id', selectedAssignment.tasks.id);
-          
+
         if (parentTaskError) {
           console.error("Parent Task Update Error:", parentTaskError);
           throw new Error("Failed to update parent task: " + parentTaskError.message);
@@ -171,7 +171,7 @@ export default function MemberTasks() {
       setSubmitModalVisible(false);
       fetchTasks();
       Alert.alert("Success", "Task submitted successfully! Great job.");
-      
+
     } catch (error: any) {
       console.error("Submit Error:", error);
       Alert.alert("Error Occurred", error?.message || "An unexpected error occurred while submitting.");
@@ -180,17 +180,17 @@ export default function MemberTasks() {
     }
   };
 
-  const filteredAssignments = assignments.filter(a => 
+  const filteredAssignments = assignments.filter(a =>
     a.tasks?.title?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const renderTask = ({ item }: { item: any }) => {
     const task = item.tasks;
     if (!task) return null;
-    
+
     const isOverdue = new Date(task.due_date) < new Date() && item.status !== 'completed';
     const isCompleted = item.status === 'completed';
-    
+
     return (
       <View className={`bg-white p-5 rounded-2xl mb-4 shadow-sm border ${isCompleted ? 'border-emerald-200 bg-emerald-50/20 opacity-80' : 'border-slate-100'}`}>
         <View className="flex-row justify-between items-start mb-3">
@@ -210,14 +210,14 @@ export default function MemberTasks() {
             </View>
             <Text className={`font-bold text-lg ${isCompleted ? 'text-emerald-800' : 'text-slate-800'}`}>{task.title}</Text>
           </View>
-          
+
           {isCompleted ? (
             <View className="bg-emerald-100 px-3 py-1.5 rounded-lg flex-row items-center gap-1 border border-emerald-200">
               <Feather name="check-circle" size={12} color="#059669" />
               <Text className="text-emerald-700 font-bold text-xs">Done</Text>
             </View>
           ) : (
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => openSubmitModal(item)}
               className="bg-indigo-600 px-4 py-2 rounded-xl flex-row items-center shadow-sm"
             >
@@ -305,7 +305,7 @@ export default function MemberTasks() {
               <Feather name="x" size={16} color="#64748b" />
             </TouchableOpacity>
           </View>
-          
+
           <ScrollView className="flex-1 p-5" keyboardShouldPersistTaps="handled">
             <View className="mb-6">
               <Text className="text-slate-800 font-bold text-xl mb-1">{selectedAssignment?.tasks?.title}</Text>
@@ -323,7 +323,7 @@ export default function MemberTasks() {
             />
 
             <Text className="text-slate-500 font-bold text-xs uppercase tracking-wider mb-2">Upload Evidence (Optional)</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={pickImage}
               className={`border-2 border-dashed rounded-xl items-center justify-center mb-6 overflow-hidden ${submissionImage ? 'border-indigo-500 bg-indigo-50/30' : 'border-slate-300 bg-slate-50 min-h-[150px]'}`}
             >
@@ -348,7 +348,7 @@ export default function MemberTasks() {
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={handleSubmitTask}
               disabled={isSubmitting}
               className={`py-4 rounded-xl items-center shadow-sm mb-10 ${isSubmitting ? 'bg-indigo-400' : 'bg-indigo-600'}`}

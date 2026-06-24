@@ -1,9 +1,9 @@
-import { View, Text, FlatList, ActivityIndicator, Image, TouchableOpacity, Modal, ScrollView, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useState, useEffect } from 'react';
-import { supabase } from '../../utils/supabase';
 import { useGlobalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, Image, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { supabase } from '../../utils/supabase';
 
 export default function ManagerProjects() {
   const { teamCode } = useGlobalSearchParams<{ teamCode: string }>();
@@ -18,20 +18,20 @@ export default function ManagerProjects() {
     try {
       const { error } = await supabase
         .from('task_assignments')
-        .update({ 
-          status: 'open', 
+        .update({
+          status: 'open',
           revisions_count: revisionsCount + 1,
           completed_at: null,
           submission_notes: null,
           submission_image_url: null
         })
         .eq('id', assignmentId);
-        
+
       if (error) throw error;
-      
+
       // Also update parent task to open so it goes back to active tasks
       await supabase.from('tasks').update({ status: 'open', completed_at: null }).eq('id', taskId);
-      
+
       setModalVisible(false);
       fetchArchivedTasks();
       alert("Revision requested! Task sent back to employee.");
@@ -48,7 +48,7 @@ export default function ManagerProjects() {
         .select('*')
         .eq('team_code', teamCode)
         .single();
-        
+
       if (!teamData) return;
 
       const { data: tasksData } = await supabase
@@ -68,11 +68,11 @@ export default function ManagerProjects() {
         .order('completed_at', { ascending: false });
 
       if (tasksData) {
-        // Filter out tasks completed less than 1 hour ago
-        const oneHourAgo = Date.now() - 60 * 60 * 1000;
+        // Filter out tasks completed less than 24 hours ago
+        const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
         const filtered = tasksData.filter(t => {
           if (!t.completed_at) return false;
-          return new Date(t.completed_at).getTime() < oneHourAgo;
+          return new Date(t.completed_at).getTime() <= twentyFourHoursAgo;
         });
         setArchivedTasks(filtered);
       }
@@ -96,7 +96,7 @@ export default function ManagerProjects() {
 
   const renderArchivedTask = ({ item }: { item: any }) => {
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         onPress={() => viewDetails(item)}
         className="bg-white p-5 rounded-2xl mb-4 shadow-sm border border-slate-100 flex-row items-center justify-between"
       >
@@ -144,7 +144,7 @@ export default function ManagerProjects() {
               <View className="w-16 h-16 bg-slate-100 rounded-full items-center justify-center mb-4">
                 <Feather name="archive" size={24} color="#94a3b8" />
               </View>
-              <Text className="text-slate-500 font-medium text-center">No projects archived yet.{'\n'}Tasks move here 1 hour after completion.</Text>
+              <Text className="text-slate-500 font-medium text-center">No projects archived yet.{'\n'}Tasks move here 24 hour after completion.</Text>
             </View>
           }
         />
@@ -159,7 +159,7 @@ export default function ManagerProjects() {
               <Feather name="x" size={16} color="#64748b" />
             </TouchableOpacity>
           </View>
-          
+
           {selectedTask && (
             <ScrollView className="flex-1 p-5">
               <View className="mb-6">
@@ -170,7 +170,7 @@ export default function ManagerProjects() {
               </View>
 
               <Text className="text-slate-800 font-bold text-lg mb-4">Team Submissions</Text>
-              
+
               {selectedTask.task_assignments?.map((assign: any, idx: number) => (
                 <View key={idx} className="bg-slate-50 rounded-2xl p-5 mb-4 border border-slate-200">
                   <View className="flex-row items-center gap-3 mb-4 border-b border-slate-200 pb-3">
@@ -183,7 +183,7 @@ export default function ManagerProjects() {
                     </View>
                     <Feather name="check-circle" size={20} color="#10b981" className="ml-auto" />
                   </View>
-                  
+
                   {assign.submission_notes ? (
                     <View className="mb-4">
                       <Text className="text-slate-500 font-bold text-[10px] uppercase tracking-wider mb-2">Submission Notes</Text>
@@ -196,8 +196,8 @@ export default function ManagerProjects() {
                   {assign.submission_image_url && (
                     <View className="mb-4">
                       <Text className="text-slate-500 font-bold text-[10px] uppercase tracking-wider mb-2">Attached Evidence</Text>
-                      <Image 
-                        source={{ uri: assign.submission_image_url }} 
+                      <Image
+                        source={{ uri: assign.submission_image_url }}
                         className="w-full h-48 rounded-xl bg-slate-200"
                         resizeMode="cover"
                       />

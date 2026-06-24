@@ -1,10 +1,10 @@
-import { View, Text, TouchableOpacity, FlatList, TextInput, Modal, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useState, useEffect } from 'react';
-import { supabase } from '../../utils/supabase';
-import { useGlobalSearchParams } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useGlobalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { supabase } from '../../utils/supabase';
 
 const CATEGORIES = ['Update', 'New Project', 'Feature', 'Bug', 'Review', 'Revision'];
 
@@ -14,7 +14,7 @@ export default function ManagerTasks() {
   const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   // Modal State
   const [isModalVisible, setModalVisible] = useState(false);
   const [isMemberModalVisible, setMemberModalVisible] = useState(false);
@@ -27,11 +27,13 @@ export default function ManagerTasks() {
   });
   const [dueDate, setDueDate] = useState(new Date(Date.now() + 86400000));
   const [showDatePicker, setShowDatePicker] = useState(false);
-  
+
   // Assignment State
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [instructionsMap, setInstructionsMap] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<any>(null);
+  const [isDetailModalVisible, setDetailModalVisible] = useState(false);
 
   const fetchTasksAndMembers = async () => {
     if (!teamCode) return;
@@ -41,7 +43,7 @@ export default function ManagerTasks() {
         .select('*')
         .eq('team_code', teamCode)
         .single();
-        
+
       if (!teamData) return;
 
       // Fetch Members
@@ -50,7 +52,7 @@ export default function ManagerTasks() {
         .select('*, roles(role_name)')
         .eq('team_id', teamData.id)
         .eq('status', 'approved');
-        
+
       if (membersData) setMembers(membersData);
 
       // Fetch Tasks
@@ -62,13 +64,24 @@ export default function ManagerTasks() {
             id,
             member_id,
             status,
+            submission_notes,
+            submission_image_url,
+            revisions_count,
             team_members(member_name, roles(role_name))
           )
         `)
         .eq('team_id', teamData.id)
         .order('created_at', { ascending: false });
 
-      if (tasksData) setTasks(tasksData);
+      if (tasksData) {
+        const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
+        const filtered = tasksData.filter(t => {
+          if (t.status !== 'completed') return true;
+          if (!t.completed_at) return true;
+          return new Date(t.completed_at).getTime() > twentyFourHoursAgo;
+        });
+        setTasks(filtered);
+      }
     } catch (e) {
       console.log('Error fetching tasks:', e);
     } finally {
@@ -104,13 +117,13 @@ export default function ManagerTasks() {
     setIsSubmitting(true);
     try {
       if (!teamCode) throw new Error("No team found");
-      
+
       const { data: teamData } = await supabase
         .from('teams')
         .select('*')
         .eq('team_code', teamCode)
         .single();
-        
+
       if (!teamData) throw new Error("No team found");
 
       // 1. Create the base task
@@ -147,22 +160,49 @@ export default function ManagerTasks() {
 
       // Reset and close
       setModalVisible(false);
-      setNewTask({ title: '', description: '', category: 'Update', priority: 'medium' });
+      setNewTask({ title: '', description: '', category: 'Update', priority: 'Medium' });
       setSelectedMembers([]);
       setInstructionsMap({});
-      setDueDate(new Date(Date.now() + 86400000));
       fetchTasksAndMembers();
-      
-    } catch (error: any) {
-      Alert.alert("Error", error.message);
+    } catch (e: any) {
+      Alert.alert("Error", e.message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const handleRequestRevision = async (assignmentId: string, currentRevisions: number, taskId: string) => {
+    try {
+      // Increment revisions_count and set status to revision
+      const { error } = await supabase
+        .from('task_assignments')
+        .update({
+          status: 'revision',
+          revisions_count: currentRevisions + 1
+        })
+        .eq('id', assignmentId);
+
+      if (error) throw error;
+
+      // Also update parent task to open so it goes back to active
+      await supabase.from('tasks').update({ status: 'open', completed_at: null }).eq('id', taskId);
+
+      setDetailModalVisible(false);
+      fetchTasksAndMembers();
+      Alert.alert("Revision Requested", "Task has been sent back to the employee.");
+    } catch (e: any) {
+      Alert.alert("Failed", "Could not request revision: " + e.message);
+    }
+  };
+
+  const viewDetails = (task: any) => {
+    setSelectedTask(task);
+    setDetailModalVisible(true);
+  };
+
   const filteredTasks = tasks.filter(t => {
     if (!t.title?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    
+
     // Hide if completed > 1 hour ago
     if (t.status === 'completed' && t.completed_at) {
       const completedTime = new Date(t.completed_at).getTime();
@@ -176,9 +216,12 @@ export default function ManagerTasks() {
 
   const renderTask = ({ item }: { item: any }) => {
     const isOverdue = new Date(item.due_date) < new Date() && item.status !== 'completed';
-    
+
     return (
-      <View className="bg-white p-5 rounded-2xl mb-4 shadow-sm border border-slate-100">
+      <TouchableOpacity 
+        onPress={() => viewDetails(item)}
+        className="bg-white rounded-3xl p-5 mb-4 shadow-sm border border-slate-100"
+      >
         <View className="flex-row justify-between items-start mb-2">
           <View className="flex-1">
             <View className="flex-row items-center gap-2 mb-1">
@@ -216,7 +259,7 @@ export default function ManagerTasks() {
             </View>
           ))}
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -226,7 +269,6 @@ export default function ManagerTasks() {
 
   return (
     <SafeAreaView className="flex-1 bg-[#F9F9FB]">
-      {/* Header & Search */}
       <View className="px-5 py-4 bg-white border-b border-slate-100 z-10">
         <Text className="text-2xl font-extrabold text-slate-800 mb-4">Tasks</Text>
         <View className="flex-row items-center bg-slate-50 rounded-xl px-4 py-3 border border-slate-200">
@@ -241,7 +283,6 @@ export default function ManagerTasks() {
         </View>
       </View>
 
-      {/* Task List */}
       {loading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color="#4f46e5" />
@@ -261,8 +302,7 @@ export default function ManagerTasks() {
         />
       )}
 
-      {/* FAB */}
-      <TouchableOpacity 
+      <TouchableOpacity
         onPress={() => setModalVisible(true)}
         className="w-14 h-14 bg-indigo-600 rounded-full items-center justify-center shadow-lg elevation-5"
         style={{ position: 'absolute', bottom: 100, right: 20, zIndex: 50, shadowColor: '#4f46e5', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }}
@@ -270,7 +310,6 @@ export default function ManagerTasks() {
         <Feather name="plus" size={24} color="white" />
       </TouchableOpacity>
 
-      {/* Create Task Modal */}
       <Modal visible={isModalVisible} animationType="slide" presentationStyle="pageSheet">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 bg-white">
           <View className="px-5 py-4 border-b border-slate-100 flex-row items-center justify-between">
@@ -279,15 +318,14 @@ export default function ManagerTasks() {
               <Feather name="x" size={16} color="#64748b" />
             </TouchableOpacity>
           </View>
-          
+
           <ScrollView className="flex-1 p-5">
-            {/* General Info */}
             <Text className="text-slate-500 font-bold text-xs uppercase tracking-wider mb-2">Task Title</Text>
             <TextInput
               placeholder="E.g., Implement new onboarding flow"
               className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 mb-4 text-slate-800 font-medium"
               value={newTask.title}
-              onChangeText={t => setNewTask({...newTask, title: t})}
+              onChangeText={t => setNewTask({ ...newTask, title: t })}
             />
 
             <Text className="text-slate-500 font-bold text-xs uppercase tracking-wider mb-2">General Description (Optional)</Text>
@@ -297,7 +335,7 @@ export default function ManagerTasks() {
               numberOfLines={3}
               className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 mb-4 text-slate-800 min-h-[80px]"
               value={newTask.description}
-              onChangeText={t => setNewTask({...newTask, description: t})}
+              onChangeText={t => setNewTask({ ...newTask, description: t })}
               style={{ textAlignVertical: 'top' }}
             />
 
@@ -306,9 +344,9 @@ export default function ManagerTasks() {
                 <Text className="text-slate-500 font-bold text-xs uppercase tracking-wider mb-2">Category</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
                   {CATEGORIES.map(cat => (
-                    <TouchableOpacity 
-                      key={cat} 
-                      onPress={() => setNewTask({...newTask, category: cat})}
+                    <TouchableOpacity
+                      key={cat}
+                      onPress={() => setNewTask({ ...newTask, category: cat })}
                       className={`mr-2 px-3 py-1.5 rounded-lg border ${newTask.category === cat ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-200'}`}
                     >
                       <Text className={`text-xs font-bold ${newTask.category === cat ? 'text-indigo-600' : 'text-slate-500'}`}>{cat}</Text>
@@ -320,7 +358,7 @@ export default function ManagerTasks() {
 
             <View className="mb-6">
               <Text className="text-slate-500 font-bold text-xs uppercase tracking-wider mb-2">Deadline</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={() => setShowDatePicker(true)}
                 className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 flex-row items-center justify-between"
               >
@@ -345,7 +383,7 @@ export default function ManagerTasks() {
             {/* Assignments */}
             <View className="flex-row items-center justify-between mb-4">
               <Text className="text-slate-800 font-extrabold text-lg">Assign Employees</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={() => setMemberModalVisible(true)}
                 className="flex-row items-center bg-indigo-50 px-3 py-1.5 rounded-full"
               >
@@ -353,7 +391,7 @@ export default function ManagerTasks() {
                 <Text className="text-indigo-600 font-bold text-xs ml-1">Add Member</Text>
               </TouchableOpacity>
             </View>
-            
+
             {selectedMembers.length === 0 ? (
               <View className="bg-slate-50 border border-slate-200 border-dashed rounded-xl p-5 items-center justify-center mb-6">
                 <Feather name="users" size={24} color="#94a3b8" className="mb-2" />
@@ -363,7 +401,7 @@ export default function ManagerTasks() {
               selectedMembers.map(memberId => {
                 const member = members.find(m => m.id === memberId);
                 if (!member) return null;
-                
+
                 return (
                   <View key={member.id} className="mb-4 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                     <View className="p-3 bg-slate-50 flex-row items-center justify-between border-b border-slate-200">
@@ -380,7 +418,7 @@ export default function ManagerTasks() {
                         <Feather name="trash-2" size={14} color="#ef4444" />
                       </TouchableOpacity>
                     </View>
-                    
+
                     <View className="p-3">
                       <Text className="text-slate-500 font-bold text-[10px] uppercase tracking-wider mb-2">Specific Instructions</Text>
                       <TextInput
@@ -388,7 +426,7 @@ export default function ManagerTasks() {
                         multiline
                         className="bg-white border border-slate-200 rounded-lg p-3 text-sm text-slate-800"
                         value={instructionsMap[member.id] || ''}
-                        onChangeText={t => setInstructionsMap({...instructionsMap, [member.id]: t})}
+                        onChangeText={t => setInstructionsMap({ ...instructionsMap, [member.id]: t })}
                         style={{ textAlignVertical: 'top', minHeight: 80 }}
                       />
                     </View>
@@ -397,7 +435,7 @@ export default function ManagerTasks() {
               })
             )}
 
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={handleCreateTask}
               disabled={isSubmitting || selectedMembers.length === 0}
               className={`mt-6 mb-10 py-4 rounded-xl items-center shadow-sm ${isSubmitting || selectedMembers.length === 0 ? 'bg-indigo-300' : 'bg-indigo-600'}`}
@@ -422,13 +460,13 @@ export default function ManagerTasks() {
                 <Feather name="x" size={16} color="#64748b" />
               </TouchableOpacity>
             </View>
-            
+
             <ScrollView className="p-5">
               {getUnselectedMembers().length === 0 ? (
                 <Text className="text-slate-500 text-center mt-5">All team members have been assigned.</Text>
               ) : (
                 getUnselectedMembers().map(member => (
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     key={member.id}
                     onPress={() => addMember(member.id)}
                     className="flex-row items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-xl mb-3"
@@ -449,6 +487,83 @@ export default function ManagerTasks() {
               <View className="h-10" />
             </ScrollView>
           </View>
+        </View>
+      </Modal>
+
+      {/* Task Detail Modal */}
+      <Modal visible={isDetailModalVisible} animationType="slide" presentationStyle="pageSheet">
+        <View className="flex-1 bg-white pt-12">
+          <View className="px-5 py-4 border-b border-slate-100 flex-row items-center justify-between">
+            <Text className="text-lg font-bold text-slate-800">Task Details</Text>
+            <TouchableOpacity onPress={() => setDetailModalVisible(false)} className="w-8 h-8 items-center justify-center bg-slate-100 rounded-full">
+              <Feather name="x" size={16} color="#64748b" />
+            </TouchableOpacity>
+          </View>
+
+          {selectedTask && (
+            <ScrollView className="flex-1 p-5">
+              <View className="mb-6">
+                <Text className="text-slate-800 font-bold text-2xl mb-2">{selectedTask.title}</Text>
+                {selectedTask.description ? (
+                  <Text className="text-slate-600 text-base leading-6">{selectedTask.description}</Text>
+                ) : null}
+              </View>
+
+              <Text className="text-slate-800 font-bold text-lg mb-4">Team Submissions</Text>
+
+              {selectedTask.task_assignments?.map((assign: any, idx: number) => (
+                <View key={idx} className="bg-slate-50 rounded-2xl p-5 mb-4 border border-slate-200">
+                  <View className="flex-row items-center gap-3 mb-4 border-b border-slate-200 pb-3">
+                    <View className="w-10 h-10 rounded-full bg-emerald-100 items-center justify-center">
+                      <Feather name="user" size={18} color="#059669" />
+                    </View>
+                    <View>
+                      <Text className="text-slate-800 font-bold text-base">{assign.team_members?.member_name}</Text>
+                      <Text className="text-slate-500 text-xs uppercase tracking-wider">{assign.team_members?.roles?.role_name}</Text>
+                    </View>
+                    {assign.status === 'completed' && (
+                      <Feather name="check-circle" size={20} color="#10b981" className="ml-auto" />
+                    )}
+                  </View>
+
+                  {assign.status === 'completed' ? (
+                    <>
+                      {assign.submission_notes ? (
+                        <View className="mb-4">
+                          <Text className="text-slate-500 font-bold text-[10px] uppercase tracking-wider mb-2">Submission Notes</Text>
+                          <Text className="text-slate-700 italic">"{assign.submission_notes}"</Text>
+                        </View>
+                      ) : (
+                        <Text className="text-slate-400 italic mb-4">No notes provided.</Text>
+                      )}
+
+                      {assign.submission_image_url && (
+                        <View className="mb-4">
+                          <Text className="text-slate-500 font-bold text-[10px] uppercase tracking-wider mb-2">Attached Evidence</Text>
+                          <Image
+                            source={{ uri: assign.submission_image_url }}
+                            className="w-full h-48 rounded-xl bg-slate-200"
+                            resizeMode="cover"
+                          />
+                        </View>
+                      )}
+
+                      <TouchableOpacity
+                        onPress={() => handleRequestRevision(assign.id, assign.revisions_count || 0, selectedTask.id)}
+                        className="mt-2 bg-red-50 border border-red-100 py-3 rounded-xl items-center flex-row justify-center gap-2"
+                      >
+                        <Feather name="refresh-ccw" size={16} color="#ef4444" />
+                        <Text className="text-red-500 font-bold">Request Revision (-1 pt)</Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <Text className="text-slate-400 italic">Task is currently in progress...</Text>
+                  )}
+                </View>
+              ))}
+              <View className="h-10" />
+            </ScrollView>
+          )}
         </View>
       </Modal>
     </SafeAreaView>

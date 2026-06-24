@@ -10,7 +10,6 @@ export default function MemberAnalytics() {
   const [loading, setLoading] = useState(true);
   const [points, setPoints] = useState(0);
   const [stats, setStats] = useState({ assigned: 0, completed: 0, revisions: 0 });
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -24,10 +23,9 @@ export default function MemberAnalytics() {
 
   const fetchAnalytics = async () => {
     try {
-      setErrorMsg(null);
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      
+
       // Start of today for point calculations
       const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
 
@@ -41,57 +39,42 @@ export default function MemberAnalytics() {
         .eq('tasks.team_id', teamId)
         .gte('created_at', startOfMonth);
 
-      if (error) throw error;
-
       if (!assignments) return;
 
       let assignedCount = assignments.length;
       let completedCount = assignments.filter(a => a.status === 'completed').length;
-      let totalRevisions = assignments.reduce((acc, curr) => acc + (curr.revisions_count || 0), 0);
+      let revisionsCount = assignments.reduce((acc, curr) => acc + (curr.revisions_count || 0), 0);
 
-      setStats({ assigned: assignedCount, completed: completedCount, revisions: totalRevisions });
+      setStats({ assigned: assignedCount, completed: completedCount, revisions: revisionsCount });
 
       let calculatedPoints = 0;
 
       assignments.forEach((a: any) => {
+        // 1. Deduct penalties immediately, regardless of completion status
+        let penalty = a.revisions_count || 0;
+        if (a.tasks?.category === 'Revision') penalty += 1;
+        calculatedPoints -= penalty;
+
+        // 2. Add positive points ONLY if completed
         if (a.status === 'completed' && a.completed_at) {
-          const createdAt = new Date(a.tasks.created_at).getTime();
-          const dueDate = new Date(a.tasks.due_date).getTime();
-          const completedAt = new Date(a.completed_at).getTime();
-
-          const totalDuration = dueDate - createdAt;
-          const timeRemaining = dueDate - completedAt;
-
-          let earned = 0;
-          if (timeRemaining < 0) {
-            earned = -1;
-          } else {
-            const percentRemaining = (timeRemaining / totalDuration) * 100;
-            if (percentRemaining >= 75) earned = 10;
-            else if (percentRemaining >= 50) earned = 7;
-            else if (percentRemaining >= 25) earned = 3;
+          if (a.tasks?.category !== 'Revision') {
+             calculatedPoints += 10;
           }
-
-          const revisions = a.revisions_count || 0;
-          earned -= revisions;
-
-          calculatedPoints += earned;
         }
       });
 
       setPoints(calculatedPoints);
-    } catch (e: any) {
-      console.log('Error fetching analytics:', e);
-      setErrorMsg(e.message);
+    } catch (e) {
+      console.log("Member Analytics Error:", e);
     } finally {
       setLoading(false);
     }
   };
 
   const maxGraphValue = Math.max(stats.assigned, stats.completed, stats.revisions, 1);
-  const assignedHeight = Math.max(20, (stats.assigned / maxGraphValue) * 120);
-  const completedHeight = Math.max(20, (stats.completed / maxGraphValue) * 120);
-  const revisionsHeight = Math.max(20, (stats.revisions / maxGraphValue) * 120);
+  const assignedHeight = (stats.assigned / maxGraphValue) * 100;
+  const completedHeight = (stats.completed / maxGraphValue) * 100;
+  const revisionsHeight = (stats.revisions / maxGraphValue) * 100;
 
   return (
     <SafeAreaView className="flex-1 bg-[#F9F9FB]">
@@ -106,18 +89,11 @@ export default function MemberAnalytics() {
         </View>
       </View>
 
-      {errorMsg && (
-        <View className="m-5 p-4 bg-red-50 border border-red-200 rounded-xl">
-          <Text className="text-red-600 font-bold mb-1">Database Sync Error</Text>
-          <Text className="text-red-500 text-xs">{errorMsg}</Text>
-        </View>
-      )}
-
       {loading ? (
         <View className="flex-1 items-center justify-center"><ActivityIndicator color="#4f46e5" /></View>
       ) : (
         <ScrollView className="flex-1 px-5 pt-5" contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-          
+
           <View className="bg-white rounded-[24px] p-6 shadow-sm border border-slate-100 mb-6">
             <Text className="text-slate-800 font-bold text-lg mb-6">Monthly Activity Graph</Text>
 
@@ -125,19 +101,19 @@ export default function MemberAnalytics() {
               {/* Assigned Bar */}
               <View className="items-center flex-1">
                 <Text className="text-slate-500 font-bold mb-2 text-xs">{stats.assigned}</Text>
-                <View className="w-12 bg-indigo-200 rounded-t-xl" style={{ height: assignedHeight }} />
+                <View className="w-12 bg-indigo-200 rounded-t-xl" style={{ height: `${assignedHeight}%`, minHeight: 20 }} />
                 <Text className="text-slate-600 font-bold mt-3 text-xs">Assigned</Text>
               </View>
               {/* Completed Bar */}
               <View className="items-center flex-1">
                 <Text className="text-slate-500 font-bold mb-2 text-xs">{stats.completed}</Text>
-                <View className="w-12 bg-emerald-400 rounded-t-xl shadow-sm shadow-emerald-200" style={{ height: completedHeight }} />
+                <View className="w-12 bg-emerald-400 rounded-t-xl shadow-sm shadow-emerald-200" style={{ height: `${completedHeight}%`, minHeight: 20 }} />
                 <Text className="text-slate-600 font-bold mt-3 text-xs">Completed</Text>
               </View>
               {/* Revisions Bar */}
               <View className="items-center flex-1">
                 <Text className="text-slate-500 font-bold mb-2 text-xs">{stats.revisions}</Text>
-                <View className="w-12 bg-rose-400 rounded-t-xl shadow-sm shadow-rose-200" style={{ height: revisionsHeight }} />
+                <View className="w-12 bg-rose-400 rounded-t-xl shadow-sm shadow-rose-200" style={{ height: `${revisionsHeight}%`, minHeight: 20 }} />
                 <Text className="text-slate-600 font-bold mt-3 text-xs">Revisions</Text>
               </View>
             </View>
@@ -149,7 +125,7 @@ export default function MemberAnalytics() {
               <Text className="text-slate-800 font-bold text-base">How points are calculated</Text>
             </View>
             <Text className="text-slate-500 text-xs mb-4 leading-5">Points are officially locked in at midnight each day and reset at the beginning of the month.</Text>
-            
+
             <View className="gap-3">
               <View className="flex-row justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
                 <Text className="text-slate-700 text-sm font-medium">Submitted with {'>'}75% time left</Text>
