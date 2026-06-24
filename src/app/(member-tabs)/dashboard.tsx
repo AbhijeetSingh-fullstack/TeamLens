@@ -1,16 +1,16 @@
-import { View, Text, TouchableOpacity, ScrollView, StatusBar, Image } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { useState, useEffect } from 'react';
-import { supabase } from '../../utils/supabase';
-import { format, isToday, isTomorrow } from 'date-fns';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { format, isToday, isTomorrow } from 'date-fns';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { ScrollView, StatusBar, Text, TouchableOpacity, View, Modal } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { supabase } from '../../utils/supabase';
 
 export default function MemberDashboard() {
-  const { teamName, memberName, roleName, memberId, teamId } = useLocalSearchParams<{ 
-    teamName: string, 
-    memberName: string, 
+  const { teamName, memberName, roleName, memberId, teamId } = useLocalSearchParams<{
+    teamName: string,
+    memberName: string,
     roleName: string,
     memberId: string,
     teamId: string
@@ -26,6 +26,8 @@ export default function MemberDashboard() {
 
   const [deadlines, setDeadlines] = useState<any[]>([]);
   const [activities, setActivities] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [isNotificationsVisible, setNotificationsVisible] = useState(false);
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
 
   useEffect(() => {
@@ -52,15 +54,18 @@ export default function MemberDashboard() {
         .eq('team_id', teamId)
         .eq('status', 'approved');
 
-      // Fetch Tasks
-      const { data: tasks } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('assigned_to', memberId);
+      // Fetch Task Assignments
+      const { data: assignments } = await supabase
+        .from('task_assignments')
+        .select(`
+          id, status, created_at,
+          tasks!inner (id, title, due_date, priority, status)
+        `)
+        .eq('member_id', memberId);
 
-      const assignedCount = tasks?.filter(t => t.status === 'open').length || 0;
-      const completedCount = tasks?.filter(t => t.status === 'completed').length || 0;
-      const totalTasks = tasks?.length || 0;
+      const assignedCount = assignments?.filter(a => a.status === 'open').length || 0;
+      const completedCount = assignments?.filter(a => a.status === 'completed').length || 0;
+      const totalTasks = assignments?.length || 0;
       const score = totalTasks > 0 ? Math.round((completedCount / totalTasks) * 100) : 0;
 
       setStats({
@@ -69,18 +74,16 @@ export default function MemberDashboard() {
         productivityScore: score
       });
 
-      // Upcoming Deadlines (Open tasks ordered by date)
-      const { data: upcoming } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('assigned_to', memberId)
-        .eq('status', 'open')
-        .order('due_date', { ascending: true })
-        .limit(3);
+      // Upcoming Deadlines (Open assignments ordered by date)
+      const openAssignments = assignments?.filter(a => a.status === 'open') || [];
+      const upcoming = openAssignments
+        .map(a => a.tasks)
+        .sort((a: any, b: any) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())
+        .slice(0, 3);
 
-      setDeadlines(upcoming || []);
+      setDeadlines(upcoming);
 
-      // Recent Activity
+      // Recent Activity (Tasks Assigned to me + General Activities)
       const { data: recentActs } = await supabase
         .from('activities')
         .select('*')
@@ -88,7 +91,23 @@ export default function MemberDashboard() {
         .order('created_at', { ascending: false })
         .limit(5);
 
-      setActivities(recentActs || []);
+      const taskActs = (assignments || [])
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 5)
+        .map(a => ({
+          id: a.id,
+          action: `Assigned new task: ${a.tasks.title}`,
+          created_at: a.created_at
+        }));
+
+      setNotifications(taskActs);
+
+      // Merge and sort
+      const mergedActivities = [...(recentActs || []), ...taskActs]
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 5);
+
+      setActivities(mergedActivities);
 
       // Check for unread messages (receiver_id is memberId)
       const { data: latestMessages } = await supabase
@@ -139,17 +158,22 @@ export default function MemberDashboard() {
   return (
     <SafeAreaView className="flex-1 bg-[#F9F9FB]">
       <StatusBar barStyle="dark-content" />
-      <ScrollView className="flex-1 px-5 pt-4" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-        
+      <ScrollView className="flex-1 px-5 pt-4" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+
         {/* Header */}
         <View className="flex-row items-center justify-between mb-8">
           <Text className="text-xl font-bold text-slate-800">TeamLens</Text>
           <View className="flex-row items-center gap-4">
-            <TouchableOpacity className="relative w-10 h-10 items-center justify-center">
-              <Feather name="bell" size={24} color="#475569" />
-              <View className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
-            </TouchableOpacity>
             <TouchableOpacity 
+              className="relative w-10 h-10 items-center justify-center"
+              onPress={() => setNotificationsVisible(true)}
+            >
+              <Feather name="bell" size={24} color="#475569" />
+              {notifications.length > 0 && (
+                <View className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
               className="relative w-10 h-10 items-center justify-center"
               onPress={() => router.push({ pathname: '/message', params: { teamName, memberName, memberId, teamId } })}
             >
@@ -171,7 +195,7 @@ export default function MemberDashboard() {
 
         {/* Stats Cards Vertical */}
         <View className="gap-4 mb-6">
-          
+
           {/* Card 1: Active Members */}
           <View className="bg-white rounded-[20px] p-5 shadow-sm border border-slate-100 flex-row items-center justify-between">
             <View className="flex-row items-center gap-4">
@@ -221,50 +245,50 @@ export default function MemberDashboard() {
         {/* Upcoming Deadlines */}
         <View className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 mb-6">
           <View className="flex-row justify-between items-center mb-4">
-             <Text className="text-slate-800 font-bold text-sm">Upcoming Deadlines</Text>
-             <TouchableOpacity><Text className="text-indigo-600 text-[10px] font-bold">View All</Text></TouchableOpacity>
+            <Text className="text-slate-800 font-bold text-sm">Upcoming Deadlines</Text>
+            <TouchableOpacity><Text className="text-indigo-600 text-[10px] font-bold">View All</Text></TouchableOpacity>
           </View>
-          
+
           <View className="gap-3">
-             {deadlines.length === 0 ? (
-               <View className="py-4 items-center justify-center">
-                 <Text className="text-slate-400 text-xs">No upcoming deadlines! 🎉</Text>
-               </View>
-             ) : (
-               deadlines.map(task => (
-                 <View key={task.id} className="border border-slate-100 rounded-xl p-3 flex-row items-start gap-3">
-                   <View className="w-4 h-4 rounded border border-slate-300 mt-0.5" />
-                   <View className="flex-1">
-                     <View className="flex-row justify-between items-start mb-1">
-                       <Text className="text-slate-800 font-bold text-xs flex-1">{task.title}</Text>
-                       <View className={`px-2 py-0.5 rounded text-center ml-2 ${task.priority === 'high' ? 'bg-red-50' : task.priority === 'medium' ? 'bg-orange-50' : 'bg-slate-50'}`}>
-                         <Text className={`text-[8px] font-bold uppercase ${task.priority === 'high' ? 'text-red-500' : task.priority === 'medium' ? 'text-orange-500' : 'text-slate-500'}`}>
-                           {task.priority || 'NORMAL'}
-                         </Text>
-                       </View>
-                     </View>
-                      <View className="flex-row items-center gap-3">
-                        <View className="flex-row items-center gap-1">
-                          <Feather name="clock" size={10} color="#94a3b8" />
-                          <Text className="text-slate-400 text-[10px]">{formatDueDate(task.due_date)}</Text>
-                        </View>
+            {deadlines.length === 0 ? (
+              <View className="py-4 items-center justify-center">
+                <Text className="text-slate-400 text-xs">No upcoming deadlines! 🎉</Text>
+              </View>
+            ) : (
+              deadlines.map(task => (
+                <View key={task.id} className="border border-slate-100 rounded-xl p-3 flex-row items-start gap-3">
+                  <View className="w-4 h-4 rounded border border-slate-300 mt-0.5" />
+                  <View className="flex-1">
+                    <View className="flex-row justify-between items-start mb-1">
+                      <Text className="text-slate-800 font-bold text-xs flex-1">{task.title}</Text>
+                      <View className={`px-2 py-0.5 rounded text-center ml-2 ${task.priority === 'high' ? 'bg-red-50' : task.priority === 'medium' ? 'bg-orange-50' : 'bg-slate-50'}`}>
+                        <Text className={`text-[8px] font-bold uppercase ${task.priority === 'high' ? 'text-red-500' : task.priority === 'medium' ? 'text-orange-500' : 'text-slate-500'}`}>
+                          {task.priority || 'NORMAL'}
+                        </Text>
                       </View>
-                   </View>
-                 </View>
-               ))
-             )}
+                    </View>
+                    <View className="flex-row items-center gap-3">
+                      <View className="flex-row items-center gap-1">
+                        <Feather name="clock" size={10} color="#94a3b8" />
+                        <Text className="text-slate-400 text-[10px]">{formatDueDate(task.due_date)}</Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              ))
+            )}
           </View>
         </View>
 
         {/* Recent Activity */}
         <View className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 mb-6">
           <Text className="text-slate-800 font-bold text-sm mb-4">Recent Activity</Text>
-          
+
           <View className="pl-2">
             {activities.length === 0 ? (
-               <View className="py-4 items-center justify-center">
-                 <Text className="text-slate-400 text-xs">No recent activity</Text>
-               </View>
+              <View className="py-4 items-center justify-center">
+                <Text className="text-slate-400 text-xs">No recent activity</Text>
+              </View>
             ) : (
               activities.map((activity, index) => (
                 <View key={activity.id} className={`border-l border-slate-200 ml-1.5 pl-4 relative ${index === activities.length - 1 ? '' : 'pb-6'}`}>
@@ -278,6 +302,45 @@ export default function MemberDashboard() {
         </View>
 
       </ScrollView>
+
+      {/* Notifications Modal */}
+      <Modal visible={isNotificationsVisible} transparent animationType="fade">
+        <View className="flex-1 bg-black/50 justify-end">
+          <View className="bg-white rounded-t-3xl min-h-[50%] max-h-[80%]">
+            <View className="p-5 border-b border-slate-100 flex-row items-center justify-between">
+              <Text className="text-lg font-bold text-slate-800">Notifications</Text>
+              <TouchableOpacity onPress={() => setNotificationsVisible(false)} className="w-8 h-8 items-center justify-center bg-slate-100 rounded-full">
+                <Feather name="x" size={16} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView className="p-5">
+              {notifications.length === 0 ? (
+                <Text className="text-slate-500 text-center mt-5">No new notifications.</Text>
+              ) : (
+                notifications.map(notif => (
+                  <View key={notif.id} className="border-b border-slate-100 pb-4 mb-4">
+                    <View className="flex-row items-center gap-3 mb-2">
+                      <View className="w-8 h-8 rounded-full bg-indigo-100 items-center justify-center">
+                        <Feather name="clipboard" size={14} color="#4f46e5" />
+                      </View>
+                      <View className="flex-1">
+                        <Text className="text-slate-800 font-bold text-sm">New Task Assigned</Text>
+                        <Text className="text-slate-500 text-xs">{formatTimeAgo(notif.created_at)}</Text>
+                      </View>
+                    </View>
+                    <View className="bg-indigo-50/50 p-3 rounded-xl ml-11 border border-indigo-100">
+                      <Text className="text-indigo-900 text-sm font-medium">{notif.action.replace('Assigned new task: ', '')}</Text>
+                    </View>
+                  </View>
+                ))
+              )}
+              <View className="h-10" />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
