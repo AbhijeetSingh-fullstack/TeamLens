@@ -10,6 +10,7 @@ export default function ManagerAnalytics() {
   const [loading, setLoading] = useState(true);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [monthlyStats, setMonthlyStats] = useState({ assigned: 0, completed: 0 });
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -23,7 +24,9 @@ export default function ManagerAnalytics() {
 
   const fetchAnalytics = async () => {
     try {
-      const { data: teamData } = await supabase.from('teams').select('id').eq('team_code', teamCode).single();
+      setErrorMsg(null);
+      const { data: teamData, error: teamError } = await supabase.from('teams').select('id').eq('team_code', teamCode).single();
+      if (teamError) throw teamError;
       if (!teamData) return;
 
       const now = new Date();
@@ -104,16 +107,17 @@ export default function ManagerAnalytics() {
 
       const sortedLeaderboard = Object.values(pointsMap).sort((a: any, b: any) => b.points - a.points);
       setLeaderboard(sortedLeaderboard);
-    } catch (e) {
-      console.log("Analytics Error:", e);
-    } finally {
+      setLoading(false);
+    } catch (e: any) {
+      console.log('Error fetching analytics:', e);
+      setErrorMsg(e.message);
       setLoading(false);
     }
   };
 
   const maxGraphValue = Math.max(monthlyStats.assigned, monthlyStats.completed, 1);
-  const assignedHeight = (monthlyStats.assigned / maxGraphValue) * 100;
-  const completedHeight = (monthlyStats.completed / maxGraphValue) * 100;
+  const assignedHeight = Math.max(20, (monthlyStats.assigned / maxGraphValue) * 120);
+  const completedHeight = Math.max(20, (monthlyStats.completed / maxGraphValue) * 120);
 
   return (
     <SafeAreaView className="flex-1 bg-[#F9F9FB]">
@@ -121,6 +125,13 @@ export default function ManagerAnalytics() {
         <Text className="text-2xl font-extrabold text-slate-800 mb-1">Analytics</Text>
         <Text className="text-slate-500 text-sm">Monthly team performance & leaderboard</Text>
       </View>
+
+      {errorMsg && (
+        <View className="m-5 p-4 bg-red-50 border border-red-200 rounded-xl">
+          <Text className="text-red-600 font-bold mb-1">Database Sync Error</Text>
+          <Text className="text-red-500 text-xs">{errorMsg}</Text>
+        </View>
+      )}
 
       {loading ? (
         <View className="flex-1 items-center justify-center"><ActivityIndicator color="#4f46e5" /></View>
@@ -139,12 +150,12 @@ export default function ManagerAnalytics() {
             <View className="flex-row items-end justify-center h-48 gap-8 border-b border-slate-100 pb-2">
               <View className="items-center">
                 <Text className="text-slate-500 font-bold mb-2 text-xs">{monthlyStats.assigned}</Text>
-                <View className="w-16 bg-slate-200 rounded-t-xl" style={{ height: `${assignedHeight}%`, minHeight: 20 }} />
+                <View className="w-16 bg-slate-200 rounded-t-xl" style={{ height: assignedHeight }} />
                 <Text className="text-slate-600 font-medium mt-3 text-sm">Assigned</Text>
               </View>
               <View className="items-center">
                 <Text className="text-slate-500 font-bold mb-2 text-xs">{monthlyStats.completed}</Text>
-                <View className="w-16 bg-emerald-400 rounded-t-xl shadow-sm shadow-emerald-200" style={{ height: `${completedHeight}%`, minHeight: 20 }} />
+                <View className="w-16 bg-emerald-400 rounded-t-xl shadow-sm shadow-emerald-200" style={{ height: completedHeight }} />
                 <Text className="text-slate-600 font-medium mt-3 text-sm">Completed</Text>
               </View>
             </View>
