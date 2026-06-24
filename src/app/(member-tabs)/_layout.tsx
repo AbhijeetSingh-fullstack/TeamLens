@@ -8,16 +8,22 @@ const TAB_BAR_WIDTH = width - 40; // Since left/right absolute positioning is 20
 const TAB_WIDTH = TAB_BAR_WIDTH / 5; // 5 tabs
 
 function CustomTabBar({ state, descriptors, navigation }: any) {
-  const slideAnim = useRef(new Animated.Value(state.index * TAB_WIDTH)).current;
+  const visibleRoutes = state.routes.filter((route: any) => route.name !== 'message');
+
+  const visibleIndex = visibleRoutes.findIndex((route: any) => route.key === state.routes[state.index]?.key);
+
+  const slideAnim = useRef(new Animated.Value((visibleIndex >= 0 ? visibleIndex : 0) * TAB_WIDTH)).current;
 
   useEffect(() => {
-    Animated.spring(slideAnim, {
-      toValue: state.index * TAB_WIDTH,
-      useNativeDriver: true,
-      bounciness: 10,
-      speed: 14,
-    }).start();
-  }, [state.index]);
+    if (visibleIndex >= 0) {
+      Animated.spring(slideAnim, {
+        toValue: visibleIndex * TAB_WIDTH,
+        useNativeDriver: true,
+        bounciness: 10,
+        speed: 14,
+      }).start();
+    }
+  }, [visibleIndex]);
 
   return (
     <View style={{
@@ -58,8 +64,8 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 
       {/* Tab Buttons */}
       <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
-        {state.routes.map((route: any, index: number) => {
-          const isFocused = state.index === index;
+        {visibleRoutes.map((route: any, index: number) => {
+          const isFocused = visibleIndex === index;
 
           const onPress = () => {
             const event = navigation.emit({
@@ -77,7 +83,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           let iconName: any = 'home';
           if (route.name === 'tasks') iconName = 'check-square';
           if (route.name === 'analytics') iconName = 'bar-chart-2';
-          if (route.name === 'message') iconName = 'message-square';
+          if (route.name === 'schedule') iconName = 'calendar';
           if (route.name === 'profile') iconName = 'user';
 
           return (
@@ -110,8 +116,9 @@ export default function MemberTabsLayout() {
       <Tabs.Screen name="dashboard" />
       <Tabs.Screen name="tasks" />
       <Tabs.Screen name="analytics" />
-      <Tabs.Screen name="message" />
+      <Tabs.Screen name="schedule" />
       <Tabs.Screen name="profile" />
+      <Tabs.Screen name="message" options={{ href: null }} />
     </Tabs>
   );
 }

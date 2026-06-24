@@ -6,6 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../utils/supabase';
 import { decode } from 'base64-arraybuffer';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Message = {
   id: string;
@@ -69,6 +70,15 @@ export default function ChatScreen() {
           return true;
         });
         setMessages(filtered);
+        
+        // Mark as read
+        const theirId = receiverId === 'manager' ? 'manager' : receiverId;
+        if (theirId) {
+          const stored = await AsyncStorage.getItem('lastReadTimes');
+          const lastReadTimes = stored ? JSON.parse(stored) : {};
+          lastReadTimes[theirId] = Date.now();
+          await AsyncStorage.setItem('lastReadTimes', JSON.stringify(lastReadTimes));
+        }
       }
     } catch (e) {
       console.log('Error fetching messages:', e);

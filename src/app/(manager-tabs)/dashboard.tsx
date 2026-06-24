@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../utils/supabase';
 import { Feather } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Member = {
   id: string;
@@ -34,6 +35,7 @@ export default function ManagerDashboard() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showManageTeam, setShowManageTeam] = useState(false);
   const [newRoleName, setNewRoleName] = useState('');
+  const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
 
   // Poll for new members and roles
   useEffect(() => {
@@ -105,6 +107,27 @@ export default function ManagerDashboard() {
             .eq('team_id', teamData.id);
           
           if (rolesData) setRoles(rolesData);
+
+          // Check for unread messages (receiver_id is null for manager)
+          const { data: latestMessages } = await supabase
+            .from('messages')
+            .select('sender_id, created_at')
+            .is('receiver_id', null)
+            .eq('team_id', teamData.id);
+
+          if (latestMessages) {
+            const stored = await AsyncStorage.getItem('lastReadTimes');
+            const lastReadTimes = stored ? JSON.parse(stored) : {};
+            let hasUnread = false;
+            for (const msg of latestMessages) {
+              const lastRead = lastReadTimes[msg.sender_id || 'unknown'] || 0;
+              if (new Date(msg.created_at).getTime() > lastRead) {
+                hasUnread = true;
+                break;
+              }
+            }
+            setHasUnreadMessages(hasUnread);
+          }
         }
       } catch (error) {
         console.log('Error fetching data:', error);
@@ -215,10 +238,15 @@ export default function ManagerDashboard() {
                 <View className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
               )}
             </TouchableOpacity>
-            <Image 
-              source={{ uri: 'https://i.pravatar.cc/150?img=11' }} 
-              className="w-10 h-10 rounded-full bg-slate-200"
-            />
+            <TouchableOpacity 
+              className="w-10 h-10 items-center justify-center relative"
+              onPress={() => router.push({ pathname: '/message', params: { teamCode: displayTeamCode } })}
+            >
+              <Feather name="message-square" size={24} color="#4f46e5" />
+              {hasUnreadMessages && (
+                <View className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
+              )}
+            </TouchableOpacity>
           </View>
         </View>
 

@@ -5,6 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../utils/supabase';
 import { format, isToday, isTomorrow } from 'date-fns';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function MemberDashboard() {
   const { teamName, memberName, roleName, memberId, teamId } = useLocalSearchParams<{ 
@@ -25,6 +26,7 @@ export default function MemberDashboard() {
 
   const [deadlines, setDeadlines] = useState<any[]>([]);
   const [activities, setActivities] = useState<any[]>([]);
+  const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
 
   useEffect(() => {
     if (!teamId || !memberId) return;
@@ -87,6 +89,27 @@ export default function MemberDashboard() {
         .limit(5);
 
       setActivities(recentActs || []);
+
+      // Check for unread messages (receiver_id is memberId)
+      const { data: latestMessages } = await supabase
+        .from('messages')
+        .select('sender_id, created_at')
+        .eq('receiver_id', memberId)
+        .eq('team_id', teamId);
+
+      if (latestMessages) {
+        const stored = await AsyncStorage.getItem('lastReadTimes');
+        const lastReadTimes = stored ? JSON.parse(stored) : {};
+        let hasUnread = false;
+        for (const msg of latestMessages) {
+          const lastRead = lastReadTimes[msg.sender_id || 'manager'] || 0;
+          if (new Date(msg.created_at).getTime() > lastRead) {
+            hasUnread = true;
+            break;
+          }
+        }
+        setHasUnreadMessages(hasUnread);
+      }
     };
 
     fetchData();
@@ -126,9 +149,15 @@ export default function MemberDashboard() {
               <Feather name="bell" size={24} color="#475569" />
               <View className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
             </TouchableOpacity>
-            <View className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-300">
-               <Image source={{ uri: `https://ui-avatars.com/api/?name=${memberName || 'User'}&background=4f46e5&color=fff` }} className="w-full h-full" />
-            </View>
+            <TouchableOpacity 
+              className="relative w-10 h-10 items-center justify-center"
+              onPress={() => router.push({ pathname: '/message', params: { teamName, memberName, memberId, teamId } })}
+            >
+              <Feather name="message-square" size={24} color="#4f46e5" />
+              {hasUnreadMessages && (
+                <View className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
+              )}
+            </TouchableOpacity>
           </View>
         </View>
 
