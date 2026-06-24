@@ -9,7 +9,7 @@ export default function ManagerAnalytics() {
   const { teamCode } = useGlobalSearchParams<{ teamCode: string }>();
   const [loading, setLoading] = useState(true);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
-  const [monthlyStats, setMonthlyStats] = useState({ assigned: 0, completed: 0 });
+  const [monthlyStats, setMonthlyStats] = useState({ assigned: 0, completed: 0, revisions: 0 });
 
   useFocusEffect(
     useCallback(() => {
@@ -57,7 +57,13 @@ export default function ManagerAnalytics() {
       let assignedThisMonth = allTasks?.length || 0;
       let completedThisMonth = allTasks?.filter(t => t.status === 'completed').length || 0;
 
-      setMonthlyStats({ assigned: assignedThisMonth, completed: completedThisMonth });
+      let totalRevisions = 0;
+      assignments.forEach((a: any) => {
+        totalRevisions += (a.revisions_count || 0);
+        if (a.tasks?.category === 'Revision') totalRevisions += 1;
+      });
+
+      setMonthlyStats({ assigned: assignedThisMonth, completed: completedThisMonth, revisions: totalRevisions });
 
       // Calculate Leaderboard
       const pointsMap: Record<string, any> = {};
@@ -97,9 +103,11 @@ export default function ManagerAnalytics() {
     }
   };
 
-  const maxGraphValue = Math.max(monthlyStats.assigned, monthlyStats.completed, 1);
-  const assignedHeight = (monthlyStats.assigned / maxGraphValue) * 100;
-  const completedHeight = (monthlyStats.completed / maxGraphValue) * 100;
+  const maxGraphValue = Math.max(monthlyStats.assigned, monthlyStats.completed, monthlyStats.revisions, 1);
+  const maxBarHeight = 120;
+  const assignedHeightPx = Math.max((monthlyStats.assigned / maxGraphValue) * maxBarHeight, 20);
+  const completedHeightPx = Math.max((monthlyStats.completed / maxGraphValue) * maxBarHeight, 20);
+  const revisionsHeightPx = Math.max((monthlyStats.revisions / maxGraphValue) * maxBarHeight, 20);
 
   return (
     <SafeAreaView className="flex-1 bg-[#F9F9FB]">
@@ -122,16 +130,21 @@ export default function ManagerAnalytics() {
               </View>
             </View>
 
-            <View className="flex-row items-end justify-center h-48 gap-8 border-b border-slate-100 pb-2">
-              <View className="items-center">
+            <View className="flex-row items-end justify-between px-2 h-48 border-b border-slate-100 pb-2">
+              <View className="items-center justify-end h-full">
                 <Text className="text-slate-500 font-bold mb-2 text-xs">{monthlyStats.assigned}</Text>
-                <View className="w-16 bg-slate-200 rounded-t-xl" style={{ height: `${assignedHeight}%`, minHeight: 20 }} />
-                <Text className="text-slate-600 font-medium mt-3 text-sm">Assigned</Text>
+                <View className="w-14 bg-slate-200 rounded-t-xl" style={{ height: assignedHeightPx }} />
+                <Text className="text-slate-500 font-medium mt-3 text-[10px] uppercase">Assigned</Text>
               </View>
-              <View className="items-center">
+              <View className="items-center justify-end h-full">
                 <Text className="text-slate-500 font-bold mb-2 text-xs">{monthlyStats.completed}</Text>
-                <View className="w-16 bg-emerald-400 rounded-t-xl shadow-sm shadow-emerald-200" style={{ height: `${completedHeight}%`, minHeight: 20 }} />
-                <Text className="text-slate-600 font-medium mt-3 text-sm">Completed</Text>
+                <View className="w-14 bg-emerald-400 rounded-t-xl shadow-sm shadow-emerald-200" style={{ height: completedHeightPx }} />
+                <Text className="text-slate-500 font-medium mt-3 text-[10px] uppercase">Completed</Text>
+              </View>
+              <View className="items-center justify-end h-full">
+                <Text className="text-slate-500 font-bold mb-2 text-xs">{monthlyStats.revisions}</Text>
+                <View className="w-14 bg-rose-400 rounded-t-xl shadow-sm shadow-rose-200" style={{ height: revisionsHeightPx }} />
+                <Text className="text-slate-500 font-medium mt-3 text-[10px] uppercase">Revisions</Text>
               </View>
             </View>
           </View>
