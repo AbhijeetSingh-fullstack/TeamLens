@@ -26,6 +26,7 @@ export default function ManagerDashboard() {
 
   const [members, setMembers] = useState<Member[]>([]);
   const [pendingMembers, setPendingMembers] = useState<Member[]>([]);
+  const [recentCompletions, setRecentCompletions] = useState<any[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
   const [teamId, setTeamId] = useState<string | null>(null);
   const [isLocked, setIsLocked] = useState(false);
@@ -128,6 +129,30 @@ export default function ManagerDashboard() {
             }
             setHasUnreadMessages(hasUnread);
           }
+
+          // Fetch recent task completions
+          const { data: completionsData } = await supabase
+            .from('task_assignments')
+            .select(`
+              id,
+              status,
+              completed_at,
+              submission_notes,
+              tasks!inner(title, team_id),
+              team_members(member_name)
+            `)
+            .eq('status', 'completed')
+            .eq('tasks.team_id', teamData.id)
+            .order('completed_at', { ascending: false })
+            .limit(5);
+            
+          if (completionsData) {
+            // Only show ones completed in the last 24 hours
+            const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).getTime();
+            const recent = completionsData.filter(c => c.completed_at && new Date(c.completed_at).getTime() > oneDayAgo);
+            setRecentCompletions(recent);
+          }
+
         }
       } catch (error) {
         console.log('Error fetching data:', error);
@@ -234,7 +259,7 @@ export default function ManagerDashboard() {
               onPress={() => setShowNotifications(true)}
             >
               <Feather name="bell" size={24} color="#4f46e5" />
-              {pendingMembers.length > 0 && (
+              {(pendingMembers.length > 0 || recentCompletions.length > 0) && (
                 <View className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
               )}
             </TouchableOpacity>
@@ -388,7 +413,7 @@ export default function ManagerDashboard() {
               </TouchableOpacity>
             </View>
 
-            {pendingMembers.length === 0 ? (
+            {pendingMembers.length === 0 && recentCompletions.length === 0 ? (
               <View className="items-center justify-center py-10">
                 <Text className="text-slate-400">No new notifications</Text>
               </View>
@@ -414,6 +439,26 @@ export default function ManagerDashboard() {
                         <Text className="text-white font-bold">Accept</Text>
                       </TouchableOpacity>
                     </View>
+                  </View>
+                ))}
+
+                {recentCompletions.map(completion => (
+                  <View key={completion.id} className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 mb-4">
+                    <View className="flex-row items-center gap-2 mb-1">
+                      <Feather name="check-circle" size={14} color="#059669" />
+                      <Text className="text-emerald-600 font-bold text-xs uppercase tracking-wider">Task Completed</Text>
+                    </View>
+                    <Text className="text-slate-800 font-bold text-base mb-1">{completion.tasks?.title}</Text>
+                    <Text className="text-slate-600 text-sm mb-3">
+                      <Text className="font-bold text-slate-800">{completion.team_members?.member_name}</Text> just submitted this task.
+                    </Text>
+                    
+                    {completion.submission_notes ? (
+                      <View className="bg-white/60 p-3 rounded-xl border border-emerald-50">
+                        <Text className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Notes</Text>
+                        <Text className="text-slate-700 italic text-sm">"{completion.submission_notes}"</Text>
+                      </View>
+                    ) : null}
                   </View>
                 ))}
               </ScrollView>

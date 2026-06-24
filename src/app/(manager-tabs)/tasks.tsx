@@ -158,7 +158,19 @@ export default function ManagerTasks() {
     }
   };
 
-  const filteredTasks = tasks.filter(t => t.title?.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredTasks = tasks.filter(t => {
+    if (!t.title?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    
+    // Hide if completed > 1 hour ago
+    if (t.status === 'completed' && t.completed_at) {
+      const completedTime = new Date(t.completed_at).getTime();
+      const oneHourAgo = Date.now() - 60 * 60 * 1000;
+      if (completedTime < oneHourAgo) {
+        return false;
+      }
+    }
+    return true;
+  });
 
   const renderTask = ({ item }: { item: any }) => {
     const isOverdue = new Date(item.due_date) < new Date() && item.status !== 'completed';
@@ -193,10 +205,10 @@ export default function ManagerTasks() {
           <Text className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Assigned To</Text>
           {item.task_assignments?.map((assign: any, idx: number) => (
             <View key={idx} className="flex-row items-center gap-2 mb-1">
-              <View className="w-6 h-6 rounded-full bg-indigo-100 items-center justify-center">
-                <Feather name="user" size={10} color="#4f46e5" />
+              <View className={`w-6 h-6 rounded-full ${assign.status === 'completed' ? 'bg-emerald-100' : 'bg-indigo-100'} items-center justify-center`}>
+                <Feather name="user" size={10} color={assign.status === 'completed' ? '#10b981' : '#4f46e5'} />
               </View>
-              <Text className="text-slate-700 text-sm font-semibold">{assign.team_members?.member_name}</Text>
+              <Text className={`text-sm font-semibold ${assign.status === 'completed' ? 'text-emerald-700' : 'text-slate-700'}`}>{assign.team_members?.member_name}</Text>
               <Text className="text-slate-400 text-xs">({assign.team_members?.roles?.role_name})</Text>
               {assign.status === 'completed' && <Feather name="check-circle" size={12} color="#10b981" className="ml-auto" />}
             </View>

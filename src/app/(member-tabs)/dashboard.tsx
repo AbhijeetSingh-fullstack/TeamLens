@@ -91,7 +91,10 @@ export default function MemberDashboard() {
         .order('created_at', { ascending: false })
         .limit(5);
 
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).getTime();
+
       const taskActs = (assignments || [])
+        .filter(a => new Date(a.created_at).getTime() > oneDayAgo)
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, 5)
         .map(a => ({

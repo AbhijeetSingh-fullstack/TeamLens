@@ -1,15 +1,24 @@
-import { View, Text, TouchableOpacity, FlatList, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, TextInput, ActivityIndicator, Modal, Image, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../utils/supabase';
 import { useGlobalSearchParams } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import { decode } from 'base64-arraybuffer';
 
 export default function MemberTasks() {
   const { memberId } = useGlobalSearchParams<{ memberId: string }>();
   const [assignments, setAssignments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Submission State
+  const [isSubmitModalVisible, setSubmitModalVisible] = useState(false);
+  const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
+  const [submissionNotes, setSubmissionNotes] = useState('');
+  const [submissionImage, setSubmissionImage] = useState<any>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchTasks = async () => {
     if (!memberId) return;
@@ -20,6 +29,8 @@ export default function MemberTasks() {
           id,
           status,
           specific_instructions,
+          submission_notes,
+          submission_image_url,
           tasks (
             id,
             title,
@@ -47,21 +58,114 @@ export default function MemberTasks() {
     return () => clearInterval(interval);
   }, [memberId]);
 
-  const toggleTaskStatus = async (assignment: any) => {
-    const newStatus = assignment.status === 'completed' ? 'open' : 'completed';
+  const openSubmitModal = (assignment: any) => {
+    setSelectedAssignment(assignment);
+    setSubmissionNotes('');
+    setSubmissionImage(null);
+    setSubmitModalVisible(true);
+  };
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+      base64: true,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setSubmissionImage(result.assets[0]);
+    }
+  };
+
+  const handleSubmitTask = async () => {
+    if (!selectedAssignment) {
+      Alert.alert("Error", "No assignment selected.");
+      return;
+    }
+    
+    setIsSubmitting(true);
+
     try {
-      // Optimistic update
-      setAssignments(assignments.map(a => 
-        a.id === assignment.id ? { ...a, status: newStatus } : a
-      ));
-      
-      await supabase
+      let imageUrl = null;
+
+      // 1. Upload Image if present
+      if (submissionImage && submissionImage.base64) {
+        // Safe extraction of extension, defaulting to jpeg
+        const uriParts = submissionImage.uri.split('.');
+        let ext = uriParts[uriParts.length - 1].split('?')[0].toLowerCase();
+        if (ext === 'jpg') ext = 'jpeg';
+        
+        const fileName = `${selectedAssignment.tasks.id}/${memberId}_${Date.now()}.${ext}`;
+        const contentType = submissionImage.mimeType || `image/${ext}`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('task-submissions')
+          .upload(fileName, decode(submissionImage.base64), {
+            contentType: contentType,
+          });
+
+        if (uploadError) {
+          console.error("Storage Error:", uploadError);
+          throw new Error("Image Upload Error: " + uploadError.message);
+        }
+
+        if (uploadData) {
+          const { data: publicUrlData } = supabase.storage.from('task-submissions').getPublicUrl(uploadData.path);
+          imageUrl = publicUrlData.publicUrl;
+        }
+      }
+
+      // 2. Update Task Assignment
+      const now = new Date().toISOString();
+      const { error: assignError } = await supabase
         .from('task_assignments')
-        .update({ status: newStatus })
-        .eq('id', assignment.id);
-    } catch (e) {
-      console.log(e);
-      fetchTasks(); // Revert on error
+        .update({ 
+          status: 'completed',
+          submission_notes: submissionNotes,
+          submission_image_url: imageUrl,
+          completed_at: now
+        })
+        .eq('id', selectedAssignment.id);
+
+      if (assignError) {
+        console.error("Assignment Update Error:", assignError);
+        throw new Error("Failed to update assignment: " + assignError.message);
+      }
+
+      // 3. Check if all assignments for this task are completed
+      const { data: allAssigns, error: allAssignsError } = await supabase
+        .from('task_assignments')
+        .select('status')
+        .eq('task_id', selectedAssignment.tasks.id);
+
+      if (allAssignsError) {
+        console.error("All Assigns Error:", allAssignsError);
+        throw new Error("Failed to check other assignments: " + allAssignsError.message);
+      }
+
+      if (allAssigns && allAssigns.every(a => a.status === 'completed')) {
+        // Update parent task to completed
+        const { error: parentTaskError } = await supabase
+          .from('tasks')
+          .update({ status: 'completed', completed_at: now })
+          .eq('id', selectedAssignment.tasks.id);
+          
+        if (parentTaskError) {
+          console.error("Parent Task Update Error:", parentTaskError);
+          throw new Error("Failed to update parent task: " + parentTaskError.message);
+        }
+      }
+
+      setSubmitModalVisible(false);
+      fetchTasks();
+      Alert.alert("Success", "Task submitted successfully! Great job.");
+      
+    } catch (error: any) {
+      console.error("Submit Error:", error);
+      Alert.alert("Error Occurred", error?.message || "An unexpected error occurred while submitting.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -74,9 +178,10 @@ export default function MemberTasks() {
     if (!task) return null;
     
     const isOverdue = new Date(task.due_date) < new Date() && item.status !== 'completed';
+    const isCompleted = item.status === 'completed';
     
     return (
-      <View className={`bg-white p-5 rounded-2xl mb-4 shadow-sm border ${item.status === 'completed' ? 'border-emerald-100 opacity-75' : 'border-slate-100'}`}>
+      <View className={`bg-white p-5 rounded-2xl mb-4 shadow-sm border ${isCompleted ? 'border-emerald-200 bg-emerald-50/20 opacity-80' : 'border-slate-100'}`}>
         <View className="flex-row justify-between items-start mb-3">
           <View className="flex-1">
             <View className="flex-row items-center gap-2 mb-2">
@@ -92,32 +197,46 @@ export default function MemberTasks() {
                 </View>
               )}
             </View>
-            <Text className={`font-bold text-lg ${item.status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{task.title}</Text>
+            <Text className={`font-bold text-lg ${isCompleted ? 'text-emerald-800' : 'text-slate-800'}`}>{task.title}</Text>
           </View>
           
-          <TouchableOpacity 
-            onPress={() => toggleTaskStatus(item)}
-            className={`w-8 h-8 rounded-full items-center justify-center border-2 ${item.status === 'completed' ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 bg-white'}`}
-          >
-            {item.status === 'completed' && <Feather name="check" size={16} color="white" />}
-          </TouchableOpacity>
+          {isCompleted ? (
+            <View className="bg-emerald-100 px-3 py-1.5 rounded-lg flex-row items-center gap-1 border border-emerald-200">
+              <Feather name="check-circle" size={12} color="#059669" />
+              <Text className="text-emerald-700 font-bold text-xs">Done</Text>
+            </View>
+          ) : (
+            <TouchableOpacity 
+              onPress={() => openSubmitModal(item)}
+              className="bg-indigo-600 px-4 py-2 rounded-xl flex-row items-center shadow-sm"
+            >
+              <Text className="text-white font-bold text-xs">Submit</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {task.description ? (
           <Text className="text-slate-500 text-sm mb-4 leading-5">{task.description}</Text>
         ) : null}
 
-        <View className="bg-indigo-50/50 rounded-xl p-4 border border-indigo-100">
+        <View className={`${isCompleted ? 'bg-white' : 'bg-indigo-50/50'} rounded-xl p-4 border ${isCompleted ? 'border-emerald-100' : 'border-indigo-100'}`}>
           <View className="flex-row items-center gap-2 mb-2">
-            <Feather name="info" size={14} color="#4f46e5" />
-            <Text className="text-indigo-600 font-bold text-xs uppercase tracking-wider">Your Instructions</Text>
+            <Feather name="info" size={14} color={isCompleted ? '#059669' : '#4f46e5'} />
+            <Text className={`${isCompleted ? 'text-emerald-700' : 'text-indigo-600'} font-bold text-xs uppercase tracking-wider`}>Your Instructions</Text>
           </View>
           <Text className="text-slate-700 text-sm font-medium">
             {item.specific_instructions || "No specific instructions provided. Follow the general description."}
           </Text>
         </View>
 
-        <View className="mt-4 pt-4 border-t border-slate-100 flex-row items-center justify-between">
+        {isCompleted && item.submission_notes && (
+          <View className="mt-4 pt-4 border-t border-emerald-100">
+            <Text className="text-emerald-700 font-bold text-xs uppercase tracking-wider mb-2">Your Submission</Text>
+            <Text className="text-slate-600 text-sm italic">"{item.submission_notes}"</Text>
+          </View>
+        )}
+
+        <View className={`mt-4 pt-4 flex-row items-center justify-between ${isCompleted ? '' : 'border-t border-slate-100'}`}>
           <View className="flex-row items-center gap-2">
             <Feather name="calendar" size={14} color="#94a3b8" />
             <Text className="text-slate-500 text-xs font-semibold">
@@ -165,6 +284,76 @@ export default function MemberTasks() {
           }
         />
       )}
+
+      {/* Submit Task Modal */}
+      <Modal visible={isSubmitModalVisible} animationType="slide" presentationStyle="pageSheet">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 bg-white">
+          <View className="px-5 py-4 border-b border-slate-100 flex-row items-center justify-between">
+            <Text className="text-lg font-bold text-slate-800">Submit Task</Text>
+            <TouchableOpacity onPress={() => setSubmitModalVisible(false)} className="w-8 h-8 items-center justify-center bg-slate-100 rounded-full">
+              <Feather name="x" size={16} color="#64748b" />
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView className="flex-1 p-5" keyboardShouldPersistTaps="handled">
+            <View className="mb-6">
+              <Text className="text-slate-800 font-bold text-xl mb-1">{selectedAssignment?.tasks?.title}</Text>
+              <Text className="text-slate-500 text-sm">Please provide details of your completed work.</Text>
+            </View>
+
+            <Text className="text-slate-500 font-bold text-xs uppercase tracking-wider mb-2">Submission Notes</Text>
+            <TextInput
+              placeholder="What did you accomplish? Any notes for the manager?"
+              multiline
+              className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 mb-6 text-slate-800 min-h-[120px]"
+              value={submissionNotes}
+              onChangeText={setSubmissionNotes}
+              style={{ textAlignVertical: 'top' }}
+            />
+
+            <Text className="text-slate-500 font-bold text-xs uppercase tracking-wider mb-2">Upload Evidence (Optional)</Text>
+            <TouchableOpacity 
+              onPress={pickImage}
+              className={`border-2 border-dashed rounded-xl items-center justify-center mb-6 overflow-hidden ${submissionImage ? 'border-indigo-500 bg-indigo-50/30' : 'border-slate-300 bg-slate-50 min-h-[150px]'}`}
+            >
+              {submissionImage ? (
+                <View className="w-full relative">
+                  <Image source={{ uri: submissionImage.uri }} className="w-full h-48" resizeMode="cover" />
+                  <View className="absolute inset-0 bg-black/20 items-center justify-center">
+                    <View className="bg-white/90 px-4 py-2 rounded-lg flex-row items-center shadow-sm">
+                      <Feather name="edit-2" size={14} color="#4f46e5" />
+                      <Text className="text-indigo-600 font-bold ml-2">Change Image</Text>
+                    </View>
+                  </View>
+                </View>
+              ) : (
+                <View className="items-center py-8">
+                  <View className="w-12 h-12 bg-indigo-100 rounded-full items-center justify-center mb-3">
+                    <Feather name="camera" size={20} color="#4f46e5" />
+                  </View>
+                  <Text className="text-slate-600 font-medium text-center">Tap to upload a screenshot or photo</Text>
+                  <Text className="text-slate-400 text-xs mt-1">JPEG, PNG supported</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              onPress={handleSubmitTask}
+              disabled={isSubmitting}
+              className={`py-4 rounded-xl items-center shadow-sm mb-10 ${isSubmitting ? 'bg-indigo-400' : 'bg-indigo-600'}`}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <View className="flex-row items-center gap-2">
+                  <Feather name="check" size={18} color="white" />
+                  <Text className="text-white font-bold text-base">Mark as Completed</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
