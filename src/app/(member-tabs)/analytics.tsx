@@ -1,42 +1,52 @@
 import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../utils/supabase';
-import { useGlobalSearchParams, useFocusEffect } from 'expo-router';
+
 import { Feather } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function MemberAnalytics() {
-  const { memberId, teamId } = useGlobalSearchParams<{ memberId: string, teamId: string }>();
+  const [memberId, setMemberId] = useState<string>('');
+  const [teamId, setTeamId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [points, setPoints] = useState(0);
   const [stats, setStats] = useState({ assigned: 0, completed: 0, revisions: 0 });
 
-  useFocusEffect(
-    useCallback(() => {
-      if (memberId && teamId) {
-        fetchAnalytics();
-        const interval = setInterval(fetchAnalytics, 5000);
-        return () => clearInterval(interval);
+  useEffect(() => {
+    const init = async () => {
+      let mId = memberId;
+      let tId = teamId;
+      if (!mId) {
+        mId = await AsyncStorage.getItem('memberId') || '';
+        setMemberId(mId);
       }
-    }, [memberId, teamId])
-  );
+      if (!tId) {
+        tId = await AsyncStorage.getItem('teamId') || '';
+        setTeamId(tId);
+      }
+      if (mId && tId) {
+        fetchAnalytics(mId, tId);
+      } else {
+        setLoading(false);
+      }
+    };
+    init();
+  }, []);
 
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = async (mId: string, tId: string) => {
     try {
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-
-      // Start of today for point calculations
-      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
 
       const { data: assignments } = await supabase
         .from('task_assignments')
         .select(`
           id, status, completed_at, revisions_count, created_at,
-          tasks!inner(created_at, due_date, team_id)
+          tasks!inner(created_at, due_date, team_id, category)
         `)
-        .eq('member_id', memberId)
-        .eq('tasks.team_id', teamId)
+        .eq('member_id', mId)
+        .eq('tasks.team_id', tId)
         .gte('created_at', startOfMonth);
 
       if (!assignments) return;
@@ -50,12 +60,10 @@ export default function MemberAnalytics() {
       let calculatedPoints = 0;
 
       assignments.forEach((a: any) => {
-        // 1. Deduct penalties immediately, regardless of completion status
         let penalty = a.revisions_count || 0;
         if (a.tasks?.category === 'Revision') penalty += 1;
         calculatedPoints -= penalty;
 
-        // 2. Add positive points ONLY if completed
         if (a.status === 'completed' && a.completed_at) {
           if (a.tasks?.category !== 'Revision') {
              calculatedPoints += 10;

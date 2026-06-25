@@ -2,6 +2,7 @@ import { View, Text, TouchableOpacity, StatusBar, ScrollView, TextInput, Activit
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useState } from 'react';
 import { supabase } from '../utils/supabase';
 
@@ -56,7 +57,9 @@ export default function TestLoginScreen() {
     }
   };
 
-  const loginAsMember = (member: any) => {
+  const loginAsMember = async (member: any) => {
+    await AsyncStorage.setItem('memberId', member.id);
+    await AsyncStorage.setItem('teamId', teamData.id);
     router.replace({
       pathname: '/(member-tabs)/dashboard',
       params: {
