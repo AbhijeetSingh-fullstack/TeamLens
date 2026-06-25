@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useCallback } from 'react';
 import { supabase } from '../../utils/supabase';
@@ -10,6 +10,8 @@ export default function ManagerAnalytics() {
   const [loading, setLoading] = useState(true);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [monthlyStats, setMonthlyStats] = useState({ assigned: 0, completed: 0, revisions: 0 });
+  const [selectedMember, setSelectedMember] = useState<any>(null);
+  const [modalVisible, setModalVisible] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -76,13 +78,19 @@ export default function ManagerAnalytics() {
             name: a.team_members?.member_name || 'Unknown',
             role: a.team_members?.roles?.role_name || '',
             points: 0,
-            tasksCompleted: 0
+            tasksCompleted: 0,
+            tasksAssigned: 0,
+            revisionsCount: 0
           };
         }
+
+        pointsMap[memberId].tasksAssigned += 1;
 
         // 1. Deduct penalties immediately, regardless of completion status
         let penalty = a.revisions_count || 0;
         if (a.tasks?.category === 'Revision') penalty += 1;
+        
+        pointsMap[memberId].revisionsCount += penalty;
         pointsMap[memberId].points -= penalty;
 
         // 2. Add positive points ONLY if completed
@@ -163,7 +171,11 @@ export default function ManagerAnalytics() {
               </View>
             ) : (
               leaderboard.map((member, index) => (
-                <View key={member.id} className="bg-white rounded-[20px] p-4 shadow-sm border border-slate-100 mb-3 flex-row items-center justify-between">
+                <TouchableOpacity 
+                  key={member.id} 
+                  onPress={() => { setSelectedMember(member); setModalVisible(true); }}
+                  className="bg-white rounded-[20px] p-4 shadow-sm border border-slate-100 mb-3 flex-row items-center justify-between"
+                >
                   <View className="flex-row items-center gap-4">
                     <View className={`w-8 h-8 rounded-full items-center justify-center ${index === 0 ? 'bg-amber-100' : index === 1 ? 'bg-slate-100' : index === 2 ? 'bg-orange-50' : 'bg-slate-50'}`}>
                       <Text className={`font-bold text-sm ${index === 0 ? 'text-amber-600' : index === 1 ? 'text-slate-500' : index === 2 ? 'text-orange-600' : 'text-slate-400'}`}>
@@ -178,13 +190,69 @@ export default function ManagerAnalytics() {
                   <View className="bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-100">
                     <Text className="text-indigo-600 font-bold text-base">{member.points} pts</Text>
                   </View>
-                </View>
+                </TouchableOpacity>
               ))
             )}
           </View>
 
         </ScrollView>
       )}
+
+      {/* Member Stats Modal */}
+      <Modal visible={modalVisible} transparent animationType="slide">
+        <View className="flex-1 bg-black/50 justify-end pt-20">
+          <View className="bg-white rounded-t-[32px] p-6 pb-12 shadow-xl">
+            <View className="flex-row items-center justify-between mb-8">
+              <View>
+                <Text className="text-2xl font-extrabold text-slate-800 mb-1">{selectedMember?.name}</Text>
+                <Text className="text-slate-500 font-medium">{selectedMember?.role}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setModalVisible(false)} className="w-10 h-10 items-center justify-center bg-slate-100 rounded-full">
+                <Feather name="x" size={20} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            <View className="flex-row justify-between mb-4 gap-4">
+              <View className="flex-1 bg-indigo-50 rounded-[24px] p-5 shadow-sm border border-indigo-100 items-center justify-center">
+                <View className="w-10 h-10 bg-indigo-100 rounded-full items-center justify-center mb-3">
+                  <Feather name="clipboard" size={16} color="#4f46e5" />
+                </View>
+                <Text className="text-slate-500 font-bold text-[10px] uppercase tracking-wider mb-1 text-center">Assigned</Text>
+                <Text className="text-3xl font-extrabold text-indigo-900">{selectedMember?.tasksAssigned || 0}</Text>
+              </View>
+
+              <View className="flex-1 bg-emerald-50 rounded-[24px] p-5 shadow-sm border border-emerald-100 items-center justify-center">
+                <View className="w-10 h-10 bg-emerald-100 rounded-full items-center justify-center mb-3">
+                  <Feather name="check-circle" size={16} color="#059669" />
+                </View>
+                <Text className="text-slate-500 font-bold text-[10px] uppercase tracking-wider mb-1 text-center">Completed</Text>
+                <Text className="text-3xl font-extrabold text-emerald-900">{selectedMember?.tasksCompleted || 0}</Text>
+              </View>
+
+              <View className="flex-1 bg-red-50 rounded-[24px] p-5 shadow-sm border border-red-100 items-center justify-center">
+                <View className="w-10 h-10 bg-red-100 rounded-full items-center justify-center mb-3">
+                  <Feather name="refresh-ccw" size={16} color="#dc2626" />
+                </View>
+                <Text className="text-slate-500 font-bold text-[10px] uppercase tracking-wider mb-1 text-center">Revisions</Text>
+                <Text className="text-3xl font-extrabold text-red-900">{selectedMember?.revisionsCount || 0}</Text>
+              </View>
+            </View>
+            
+            <View className="bg-orange-50 rounded-[24px] p-6 shadow-sm border border-orange-100 flex-row items-center justify-between mt-2">
+              <View className="flex-row items-center gap-4">
+                <View className="w-12 h-12 bg-orange-100 rounded-full items-center justify-center shadow-sm">
+                  <Feather name="award" size={24} color="#ea580c" />
+                </View>
+                <View>
+                  <Text className="text-orange-900 font-bold text-xl">Total Score</Text>
+                  <Text className="text-orange-700/80 font-medium text-xs">Performance points</Text>
+                </View>
+              </View>
+              <Text className="text-orange-700 font-extrabold text-4xl">{selectedMember?.points || 0}</Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

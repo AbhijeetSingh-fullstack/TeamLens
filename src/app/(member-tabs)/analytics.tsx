@@ -124,7 +124,7 @@ export default function MemberAnalytics() {
               <Feather name="info" size={18} color="#64748b" />
               <Text className="text-slate-800 font-bold text-base">How points are calculated</Text>
             </View>
-            <Text className="text-slate-500 text-xs mb-4 leading-5">Points are officially locked in at midnight each day and reset at the beginning of the month.</Text>
+            <Text className="text-slate-500 text-xs mb-4 leading-5">Points are calculated based on the task completion with due time and revision assigned.</Text>
 
             <View className="gap-3">
               <View className="flex-row justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
