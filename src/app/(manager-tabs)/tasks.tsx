@@ -250,12 +250,13 @@ export default function ManagerTasks() {
           <Text className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Assigned To</Text>
           {item.task_assignments?.map((assign: any, idx: number) => (
             <View key={idx} className="flex-row items-center gap-2 mb-1">
-              <View className={`w-6 h-6 rounded-full ${assign.status === 'completed' ? 'bg-emerald-100' : 'bg-indigo-100'} items-center justify-center`}>
-                <Feather name="user" size={10} color={assign.status === 'completed' ? '#10b981' : '#4f46e5'} />
+              <View className={`w-6 h-6 rounded-full ${assign.status === 'completed' ? 'bg-emerald-100' : assign.status === 'revision' ? 'bg-red-100' : 'bg-indigo-100'} items-center justify-center`}>
+                <Feather name={assign.status === 'revision' ? 'refresh-ccw' : 'user'} size={10} color={assign.status === 'completed' ? '#10b981' : assign.status === 'revision' ? '#ef4444' : '#4f46e5'} />
               </View>
-              <Text className={`text-sm font-semibold ${assign.status === 'completed' ? 'text-emerald-700' : 'text-slate-700'}`}>{assign.team_members?.member_name}</Text>
+              <Text className={`text-sm font-semibold ${assign.status === 'completed' ? 'text-emerald-700' : assign.status === 'revision' ? 'text-red-600' : 'text-slate-700'}`}>{assign.team_members?.member_name}</Text>
               <Text className="text-slate-400 text-xs">({assign.team_members?.roles?.role_name})</Text>
               {assign.status === 'completed' && <Feather name="check-circle" size={12} color="#10b981" className="ml-auto" />}
+              {assign.status === 'revision' && <Text className="ml-auto text-[10px] font-bold text-red-500 uppercase">Revision Requested</Text>}
             </View>
           ))}
         </View>
@@ -556,6 +557,11 @@ export default function ManagerTasks() {
                         <Text className="text-red-500 font-bold">Request Revision (-1 pt)</Text>
                       </TouchableOpacity>
                     </>
+                  ) : assign.status === 'revision' ? (
+                    <View className="bg-red-50 p-4 rounded-xl border border-red-100 flex-row items-center gap-3">
+                      <Feather name="alert-circle" size={20} color="#ef4444" />
+                      <Text className="text-red-600 font-medium flex-1">Revision has been requested for this task.</Text>
+                    </View>
                   ) : (
                     <Text className="text-slate-400 italic">Task is currently in progress...</Text>
                   )}

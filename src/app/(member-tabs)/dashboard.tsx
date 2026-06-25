@@ -93,20 +93,33 @@ export default function MemberDashboard() {
 
       const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).getTime();
 
-      const taskActs = (assignments || [])
-        .filter(a => new Date(a.created_at).getTime() > oneDayAgo)
+      const newTaskActs = (assignments || [])
+        .filter(a => a.status !== 'revision' && new Date(a.created_at).getTime() > oneDayAgo)
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, 5)
         .map(a => ({
           id: a.id,
+          type: 'new_task',
           action: `Assigned new task: ${a.tasks.title}`,
-          created_at: a.created_at
+          created_at: a.created_at,
+          taskTitle: a.tasks.title
         }));
 
-      setNotifications(taskActs);
+      const revisionActs = (assignments || [])
+        .filter(a => a.status === 'revision')
+        .map(a => ({
+          id: a.id + '_rev',
+          type: 'revision',
+          action: `Revision requested for: ${a.tasks.title}`,
+          created_at: new Date().toISOString(), // Fallback time for revision
+          taskTitle: a.tasks.title
+        }));
+
+      const allNotifs = [...revisionActs, ...newTaskActs].slice(0, 10);
+      setNotifications(allNotifs);
 
       // Merge and sort
-      const mergedActivities = [...(recentActs || []), ...taskActs]
+      const mergedActivities = [...(recentActs || []), ...newTaskActs]
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, 5);
 
@@ -324,16 +337,18 @@ export default function MemberDashboard() {
                 notifications.map(notif => (
                   <View key={notif.id} className="border-b border-slate-100 pb-4 mb-4">
                     <View className="flex-row items-center gap-3 mb-2">
-                      <View className="w-8 h-8 rounded-full bg-indigo-100 items-center justify-center">
-                        <Feather name="clipboard" size={14} color="#4f46e5" />
+                      <View className={`w-8 h-8 rounded-full ${notif.type === 'revision' ? 'bg-red-100' : 'bg-indigo-100'} items-center justify-center`}>
+                        <Feather name={notif.type === 'revision' ? 'refresh-ccw' : 'clipboard'} size={14} color={notif.type === 'revision' ? '#ef4444' : '#4f46e5'} />
                       </View>
                       <View className="flex-1">
-                        <Text className="text-slate-800 font-bold text-sm">New Task Assigned</Text>
-                        <Text className="text-slate-500 text-xs">{formatTimeAgo(notif.created_at)}</Text>
+                        <Text className={`font-bold text-sm ${notif.type === 'revision' ? 'text-red-600' : 'text-slate-800'}`}>
+                          {notif.type === 'revision' ? 'Revision Requested' : 'New Task Assigned'}
+                        </Text>
+                        <Text className="text-slate-500 text-xs">{notif.type === 'revision' ? 'Action required' : formatTimeAgo(notif.created_at)}</Text>
                       </View>
                     </View>
-                    <View className="bg-indigo-50/50 p-3 rounded-xl ml-11 border border-indigo-100">
-                      <Text className="text-indigo-900 text-sm font-medium">{notif.action.replace('Assigned new task: ', '')}</Text>
+                    <View className={`${notif.type === 'revision' ? 'bg-red-50/50 border-red-100' : 'bg-indigo-50/50 border-indigo-100'} p-3 rounded-xl ml-11 border`}>
+                      <Text className={`${notif.type === 'revision' ? 'text-red-900' : 'text-indigo-900'} text-sm font-medium`}>{notif.taskTitle || notif.action.replace('Assigned new task: ', '')}</Text>
                     </View>
                   </View>
                 ))

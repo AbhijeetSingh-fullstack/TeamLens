@@ -217,12 +217,20 @@ export default function MemberTasks() {
               <Text className="text-emerald-700 font-bold text-xs">Done</Text>
             </View>
           ) : (
-            <TouchableOpacity
-              onPress={() => openSubmitModal(item)}
-              className="bg-indigo-600 px-4 py-2 rounded-xl flex-row items-center shadow-sm"
-            >
-              <Text className="text-white font-bold text-xs">Submit</Text>
-            </TouchableOpacity>
+            <View className="flex-row items-center gap-2">
+              {item.status === 'revision' && (
+                <View className="bg-red-50 px-2 py-1.5 rounded-lg border border-red-100 flex-row items-center gap-1">
+                  <Feather name="alert-circle" size={10} color="#ef4444" />
+                  <Text className="text-[10px] font-bold text-red-500 uppercase">Revision Requested</Text>
+                </View>
+              )}
+              <TouchableOpacity
+                onPress={() => openSubmitModal(item)}
+                className="bg-indigo-600 px-4 py-2 rounded-xl flex-row items-center shadow-sm"
+              >
+                <Text className="text-white font-bold text-xs">Submit</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
 
