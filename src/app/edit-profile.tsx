@@ -6,6 +6,7 @@ import { useUser } from '@clerk/clerk-expo';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../utils/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function EditProfileScreen() {
   const router = useRouter();
@@ -79,28 +80,40 @@ export default function EditProfileScreen() {
       const updatedImage = user.imageUrl || profileImage;
 
       // Update for team members
-      await supabase
-        .from('team_members')
-        .update({ 
-          member_name: newFullName, 
-          profile_image_url: updatedImage 
-        })
-        .eq('user_id', user.id);
+      const memberDataStr = await AsyncStorage.getItem(`member_team_${user.id}`);
+      
+      if (memberDataStr) {
+        const { memberId } = JSON.parse(memberDataStr);
+        await supabase
+          .from('team_members')
+          .update({ 
+            member_name: newFullName, 
+            profile_image_url: updatedImage 
+          })
+          .eq('id', memberId);
+      }
 
-      // If they created a team, try to update teams table
-      // (Since we don't have manager_id, we do a best effort match on their name or just update it if they are logged in as a member)
-      await supabase
-        .from('teams')
-        .update({ 
-          manager_name: newFullName, 
-          manager_image_url: updatedImage 
-        })
-        .eq('manager_name', user.fullName || newFullName);
+      // Safely update teams table if they are a manager
+      const managerDataStr = await AsyncStorage.getItem(`manager_team_${user.id}`);
+      if (managerDataStr) {
+        const { teamCode } = JSON.parse(managerDataStr);
+        await supabase
+          .from('teams')
+          .update({ 
+            manager_name: newFullName, 
+            manager_image_url: updatedImage 
+          })
+          .eq('team_code', teamCode);
+      }
 
       setShowSuccess(true);
       setTimeout(() => {
         setShowSuccess(false);
-        router.back();
+        if (router.canGoBack()) {
+          router.back();
+        } else {
+          router.replace('/');
+        }
       }, 1500);
 
     } catch (error: any) {

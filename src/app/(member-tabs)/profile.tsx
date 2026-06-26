@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, ScrollView, StatusBar, Image, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StatusBar, Image, Alert, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useGlobalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -50,22 +50,26 @@ export default function MemberProfile() {
     return () => clearInterval(interval);
   }, [memberId]);
 
-  const handleSignOut = () => {
-    Alert.alert(
-      "Leave Team",
-      "Are you sure you want to sign out and leave this workspace session?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Sign Out", 
-          style: "destructive",
-          onPress: async () => {
-            await signOut();
-            router.replace('/');
-          }
-        }
-      ]
-    );
+  const [isExitModalVisible, setIsExitModalVisible] = useState(false);
+
+  const handleExitTeam = () => {
+    setIsExitModalVisible(true);
+  };
+
+  const confirmExitTeam = async () => {
+    setIsExitModalVisible(false);
+    try {
+      const { error } = await supabase
+        .from('team_members')
+        .delete()
+        .eq('id', memberId);
+        
+      if (error) throw error;
+      
+      router.replace({ pathname: '/', params: { skipAutoLogin: 'true' } });
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    }
   };
 
   return (
@@ -76,28 +80,19 @@ export default function MemberProfile() {
         {/* Header */}
         <View className="flex-row items-center justify-between mb-8">
           <Text className="text-xl font-bold text-slate-800">Profile</Text>
-          <TouchableOpacity onPress={handleSignOut} className="w-10 h-10 bg-white rounded-full items-center justify-center border border-slate-200 shadow-sm">
-            <Feather name="log-out" size={18} color="#ef4444" />
-          </TouchableOpacity>
         </View>
 
         {/* Profile Card */}
         <View className="bg-white rounded-[24px] p-6 shadow-sm border border-slate-100 items-center mb-6">
           <View className="w-20 h-20 rounded-full bg-slate-200 overflow-hidden border-4 border-indigo-50 mb-4">
-             <Image source={{ uri: user?.imageUrl || `https://ui-avatars.com/api/?name=${user?.firstName || memberName || 'User'}&background=4f46e5&color=fff` }} className="w-full h-full" resizeMode="cover" />
+             <Image source={{ uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(memberName || user?.fullName || 'User')}&background=4f46e5&color=fff` }} className="w-full h-full" resizeMode="cover" />
           </View>
-          <Text className="text-2xl font-bold text-slate-800 mb-1">{user?.fullName || memberName}</Text>
+          <Text className="text-2xl font-bold text-slate-800 mb-1">{memberName || user?.fullName}</Text>
           <View className="bg-indigo-50 px-3 py-1 rounded-full mb-4">
             <Text className="text-indigo-600 font-bold text-xs">{roleName || 'Member'}</Text>
           </View>
           
-          <TouchableOpacity 
-            onPress={() => router.push('/edit-profile')}
-            className="flex-row items-center gap-2 bg-slate-50 px-4 py-2 rounded-xl border border-slate-200 mb-2"
-          >
-            <Feather name="edit-2" size={14} color="#475569" />
-            <Text className="text-slate-600 font-bold text-xs">Edit Profile</Text>
-          </TouchableOpacity>
+
 
           <Text className="text-slate-400 text-sm mt-2">{teamName}</Text>
         </View>
@@ -136,18 +131,7 @@ export default function MemberProfile() {
         {/* Settings Links */}
         <Text className="text-slate-800 font-bold text-lg mb-4">Settings</Text>
         <View className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <TouchableOpacity 
-            onPress={() => router.push('/edit-profile')}
-            className="flex-row items-center justify-between p-4 border-b border-slate-50"
-          >
-            <View className="flex-row items-center gap-3">
-              <View className="w-8 h-8 rounded-full bg-slate-50 items-center justify-center">
-                <Feather name="user" size={16} color="#64748b" />
-              </View>
-              <Text className="text-slate-700 font-medium text-sm">Account Information</Text>
-            </View>
-            <Feather name="chevron-right" size={16} color="#cbd5e1" />
-          </TouchableOpacity>
+
           <TouchableOpacity className="flex-row items-center justify-between p-4 border-b border-slate-50">
             <View className="flex-row items-center gap-3">
               <View className="w-8 h-8 rounded-full bg-slate-50 items-center justify-center">
@@ -159,7 +143,7 @@ export default function MemberProfile() {
           </TouchableOpacity>
           <TouchableOpacity 
             onPress={() => router.push('/privacy-policy')}
-            className="flex-row items-center justify-between p-4"
+            className="flex-row items-center justify-between p-4 border-b border-slate-50"
           >
             <View className="flex-row items-center gap-3">
               <View className="w-8 h-8 rounded-full bg-slate-50 items-center justify-center">
@@ -169,9 +153,49 @@ export default function MemberProfile() {
             </View>
             <Feather name="chevron-right" size={16} color="#cbd5e1" />
           </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={handleExitTeam}
+            className="flex-row items-center justify-between p-4"
+          >
+            <View className="flex-row items-center gap-3">
+              <View className="w-8 h-8 rounded-full bg-red-50 items-center justify-center">
+                <Feather name="log-out" size={16} color="#ef4444" />
+              </View>
+              <Text className="text-red-600 font-bold text-sm">Exit Team</Text>
+            </View>
+            <Feather name="chevron-right" size={16} color="#cbd5e1" />
+          </TouchableOpacity>
         </View>
 
       </ScrollView>
+
+      {/* Exit Team Modal */}
+      <Modal visible={isExitModalVisible} transparent animationType="fade">
+        <View className="flex-1 bg-black/50 items-center justify-center p-6">
+          <View className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-xl">
+            <View className="w-12 h-12 bg-red-50 rounded-full items-center justify-center mb-4">
+              <Feather name="log-out" size={24} color="#ef4444" />
+            </View>
+            <Text className="text-xl font-bold text-slate-800 mb-2">Leave Team</Text>
+            <Text className="text-slate-500 mb-6 leading-6">Do you want to leave this team and return to the onboarding screen? You will lose access to all tasks and data.</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginTop: 8 }}>
+              <TouchableOpacity 
+                style={{ flex: 1, backgroundColor: '#f1f5f9', paddingVertical: 12, borderRadius: 12, alignItems: 'center', marginRight: 8 }}
+                onPress={() => setIsExitModalVisible(false)}
+              >
+                <Text style={{ color: '#475569', fontWeight: 'bold' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={{ flex: 1, backgroundColor: '#dc2626', paddingVertical: 12, borderRadius: 12, alignItems: 'center', marginLeft: 8 }}
+                onPress={confirmExitTeam}
+              >
+                <Text style={{ color: '#ffffff', fontWeight: 'bold' }}>Yes, Leave</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
