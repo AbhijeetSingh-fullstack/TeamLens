@@ -4,6 +4,7 @@ import { useGlobalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../utils/supabase';
+import { useClerk, useUser } from '@clerk/clerk-expo';
 
 export default function MemberProfile() {
   const { teamName, memberName, roleName, memberId, teamId } = useGlobalSearchParams<{ 
@@ -15,6 +16,8 @@ export default function MemberProfile() {
   }>();
   
   const router = useRouter();
+  const { signOut } = useClerk();
+  const { user } = useUser();
 
   const [stats, setStats] = useState({
     assignedTasks: 0,
@@ -43,7 +46,6 @@ export default function MemberProfile() {
     };
 
     fetchStats();
-    // Use an interval or just fetch once when profile loads
     const interval = setInterval(fetchStats, 5000);
     return () => clearInterval(interval);
   }, [memberId]);
@@ -57,7 +59,10 @@ export default function MemberProfile() {
         { 
           text: "Sign Out", 
           style: "destructive",
-          onPress: () => router.replace('/')
+          onPress: async () => {
+            await signOut();
+            router.replace('/');
+          }
         }
       ]
     );
@@ -79,13 +84,22 @@ export default function MemberProfile() {
         {/* Profile Card */}
         <View className="bg-white rounded-[24px] p-6 shadow-sm border border-slate-100 items-center mb-6">
           <View className="w-20 h-20 rounded-full bg-slate-200 overflow-hidden border-4 border-indigo-50 mb-4">
-             <Image source={{ uri: `https://ui-avatars.com/api/?name=${memberName || 'User'}&background=4f46e5&color=fff` }} className="w-full h-full" resizeMode="cover" />
+             <Image source={{ uri: user?.imageUrl || `https://ui-avatars.com/api/?name=${user?.firstName || memberName || 'User'}&background=4f46e5&color=fff` }} className="w-full h-full" resizeMode="cover" />
           </View>
-          <Text className="text-2xl font-bold text-slate-800 mb-1">{memberName}</Text>
-          <View className="bg-indigo-50 px-3 py-1 rounded-full mb-2">
+          <Text className="text-2xl font-bold text-slate-800 mb-1">{user?.fullName || memberName}</Text>
+          <View className="bg-indigo-50 px-3 py-1 rounded-full mb-4">
             <Text className="text-indigo-600 font-bold text-xs">{roleName || 'Member'}</Text>
           </View>
-          <Text className="text-slate-400 text-sm">{teamName}</Text>
+          
+          <TouchableOpacity 
+            onPress={() => router.push('/edit-profile')}
+            className="flex-row items-center gap-2 bg-slate-50 px-4 py-2 rounded-xl border border-slate-200 mb-2"
+          >
+            <Feather name="edit-2" size={14} color="#475569" />
+            <Text className="text-slate-600 font-bold text-xs">Edit Profile</Text>
+          </TouchableOpacity>
+
+          <Text className="text-slate-400 text-sm mt-2">{teamName}</Text>
         </View>
 
         {/* Stats Grid */}
@@ -122,7 +136,10 @@ export default function MemberProfile() {
         {/* Settings Links */}
         <Text className="text-slate-800 font-bold text-lg mb-4">Settings</Text>
         <View className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <TouchableOpacity className="flex-row items-center justify-between p-4 border-b border-slate-50">
+          <TouchableOpacity 
+            onPress={() => router.push('/edit-profile')}
+            className="flex-row items-center justify-between p-4 border-b border-slate-50"
+          >
             <View className="flex-row items-center gap-3">
               <View className="w-8 h-8 rounded-full bg-slate-50 items-center justify-center">
                 <Feather name="user" size={16} color="#64748b" />
@@ -140,12 +157,15 @@ export default function MemberProfile() {
             </View>
             <Feather name="chevron-right" size={16} color="#cbd5e1" />
           </TouchableOpacity>
-          <TouchableOpacity className="flex-row items-center justify-between p-4">
+          <TouchableOpacity 
+            onPress={() => router.push('/privacy-policy')}
+            className="flex-row items-center justify-between p-4"
+          >
             <View className="flex-row items-center gap-3">
               <View className="w-8 h-8 rounded-full bg-slate-50 items-center justify-center">
-                <Feather name="help-circle" size={16} color="#64748b" />
+                <Feather name="shield" size={16} color="#64748b" />
               </View>
-              <Text className="text-slate-700 font-medium text-sm">Help & Support</Text>
+              <Text className="text-slate-700 font-medium text-sm">Privacy Policy</Text>
             </View>
             <Feather name="chevron-right" size={16} color="#cbd5e1" />
           </TouchableOpacity>

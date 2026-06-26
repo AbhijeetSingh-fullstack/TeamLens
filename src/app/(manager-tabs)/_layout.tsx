@@ -8,7 +8,7 @@ const TAB_BAR_WIDTH = width - 40; // Since left/right absolute positioning is 20
 const TAB_WIDTH = TAB_BAR_WIDTH / 5; // 5 tabs
 
 function CustomTabBar({ state, descriptors, navigation }: any) {
-  const visibleRoutes = state.routes.filter((route: any) => route.name !== 'message');
+  const visibleRoutes = state.routes.filter((route: any) => route.name !== 'message' && route.name !== 'workspace-settings');
 
   const visibleIndex = visibleRoutes.findIndex((route: any) => route.key === state.routes[state.index]?.key);
 

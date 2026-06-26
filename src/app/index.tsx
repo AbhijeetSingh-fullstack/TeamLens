@@ -1,9 +1,88 @@
-import { View, Text, TouchableOpacity, StatusBar, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StatusBar, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, Redirect } from 'expo-router';
+import { useAuth, useClerk, useUser } from '@clerk/clerk-expo';
+import { useEffect, useState } from 'react';
+import { supabase } from '../utils/supabase';
 
 export default function WelcomeScreen() {
   const router = useRouter();
+  const { isSignedIn, isLoaded } = useAuth();
+  const { user } = useUser();
+  const { signOut } = useClerk();
+  
+  const [isCheckingAutoLogin, setIsCheckingAutoLogin] = useState(true);
+
+  useEffect(() => {
+    async function checkAutoLogin() {
+      if (!isLoaded) return;
+      if (!isSignedIn || !user) {
+        setIsCheckingAutoLogin(false);
+        return;
+      }
+
+      try {
+        // 1. Check if they are an active team member
+        const { data: memberData } = await supabase
+          .from('team_members')
+          .select('team_id, member_name, id, status, teams(team_code, team_name)')
+          .eq('user_id', user.id)
+          .single();
+
+        if (memberData && memberData.teams && memberData.status !== 'rejected') {
+          router.replace({
+            pathname: '/(member-tabs)/dashboard',
+            params: {
+              teamName: memberData.teams.team_name,
+              memberName: memberData.member_name,
+              memberId: memberData.id,
+              teamId: memberData.team_id
+            }
+          });
+          return;
+        }
+
+        // 2. Check if they are a manager (by matching their full name as a fallback since there's no manager_id)
+        const userFullName = user.fullName || `${user.firstName} ${user.lastName || ''}`.trim();
+        const { data: managerData } = await supabase
+          .from('teams')
+          .select('*')
+          .eq('manager_name', userFullName)
+          .single();
+
+        if (managerData) {
+          router.replace({
+            pathname: '/(manager-tabs)/dashboard',
+            params: {
+              teamCode: managerData.team_code,
+              teamName: managerData.team_name
+            }
+          });
+          return;
+        }
+
+      } catch (err) {
+        console.error("Auto-login error:", err);
+      } finally {
+        setIsCheckingAutoLogin(false);
+      }
+    }
+
+    checkAutoLogin();
+  }, [isLoaded, isSignedIn, user]);
+
+  if (!isLoaded || isCheckingAutoLogin) {
+    return (
+      <View className="flex-1 justify-center items-center bg-[#F5F7FF]">
+        <ActivityIndicator size="large" color="#4f46e5" />
+      </View>
+    );
+  }
+
+  // If not signed in, directly redirect to the login page
+  if (!isSignedIn) {
+    return <Redirect href="/(auth)/sign-in" />;
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-[#F5F7FF]">
@@ -91,17 +170,16 @@ export default function WelcomeScreen() {
               <Text className="text-emerald-700 font-bold text-lg">→</Text>
             </View>
           </TouchableOpacity>
-
+          
         </View>
 
         {/* Footer Area */}
         <View className="items-center gap-3 mt-auto pt-6">
-          <TouchableOpacity className="flex-row items-center gap-2">
-            <Text className="text-slate-400 text-xs font-semibold uppercase tracking-wider">↳ SIGN OUT</Text>
-          </TouchableOpacity>
-          <TouchableOpacity>
-            <Text className="text-indigo-500 text-xs font-medium">Switch to a different account</Text>
-          </TouchableOpacity>
+          {isSignedIn && (
+            <TouchableOpacity onPress={() => signOut()} className="flex-row items-center gap-2">
+              <Text className="text-slate-400 text-xs font-semibold uppercase tracking-wider">↳ SIGN OUT</Text>
+            </TouchableOpacity>
+          )}
           
           <Text className="text-slate-400 text-[10px] mt-4 font-medium">
             TeamLens Platform v1.0.0 • Secure Enterprise Onboarding

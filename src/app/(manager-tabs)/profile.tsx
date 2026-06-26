@@ -4,10 +4,13 @@ import { useGlobalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../utils/supabase';
+import { useClerk, useUser } from '@clerk/clerk-expo';
 
 export default function ManagerProfile() {
   const { teamCode, teamName } = useGlobalSearchParams<{ teamCode: string, teamName: string }>();
   const router = useRouter();
+  const { signOut } = useClerk();
+  const { user } = useUser();
 
   const [managerName, setManagerName] = useState('Manager');
   const [orgName, setOrgName] = useState('Organization');
@@ -96,7 +99,10 @@ export default function ManagerProfile() {
         { 
           text: "Sign Out", 
           style: "destructive",
-          onPress: () => router.replace('/')
+          onPress: async () => {
+            await signOut();
+            router.replace('/');
+          }
         }
       ]
     );
@@ -117,15 +123,22 @@ export default function ManagerProfile() {
 
         {/* Profile Card */}
         <View className="bg-white rounded-[24px] p-6 shadow-sm border border-slate-100 items-center mb-6">
-          <View className="w-24 h-24 rounded-full bg-slate-200 overflow-hidden border-4 border-indigo-50 mb-4">
-             <Image source={{ uri: `https://ui-avatars.com/api/?name=${managerName}&background=4f46e5&color=fff&size=200` }} className="w-full h-full" />
+          <View className="w-24 h-24 rounded-full bg-slate-200 overflow-hidden border-4 border-indigo-50 mb-4 relative">
+             <Image source={{ uri: user?.imageUrl || `https://ui-avatars.com/api/?name=${user?.firstName || managerName}&background=4f46e5&color=fff&size=200` }} className="w-full h-full" />
           </View>
-          <Text className="text-2xl font-bold text-slate-800 mb-1">{managerName}</Text>
-          <View className="bg-emerald-50 px-3 py-1 rounded-full mb-2 border border-emerald-100 flex-row items-center gap-1">
+          <Text className="text-2xl font-bold text-slate-800 mb-1">{user?.fullName || managerName}</Text>
+          <View className="bg-emerald-50 px-3 py-1 rounded-full mb-4 border border-emerald-100 flex-row items-center gap-1">
             <Feather name="shield" size={12} color="#10b981" />
             <Text className="text-emerald-600 font-bold text-xs uppercase tracking-wider">Creator</Text>
           </View>
-          <Text className="text-slate-400 text-sm font-medium">{orgName}</Text>
+          
+          <TouchableOpacity 
+            onPress={() => router.push('/edit-profile')}
+            className="flex-row items-center gap-2 bg-slate-50 px-4 py-2 rounded-xl border border-slate-200"
+          >
+            <Feather name="edit-2" size={14} color="#475569" />
+            <Text className="text-slate-600 font-bold text-xs">Edit Profile</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Workspace Info */}
@@ -177,21 +190,28 @@ export default function ManagerProfile() {
         {/* Settings Links */}
         <Text className="text-slate-800 font-bold text-lg mb-4">Settings</Text>
         <View className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <TouchableOpacity className="flex-row items-center justify-between p-4 border-b border-slate-50">
+          <TouchableOpacity 
+            onPress={() => router.push({ pathname: '/(manager-tabs)/workspace-settings', params: { teamCode: displayTeamCode } })}
+            className="flex-row items-center justify-between p-4 border-b border-slate-50"
+          >
             <View className="flex-row items-center gap-3">
-              <View className="w-8 h-8 rounded-full bg-slate-50 items-center justify-center">
-                <Feather name="settings" size={16} color="#64748b" />
+              <View className="w-8 h-8 rounded-full bg-indigo-50 items-center justify-center">
+                <Feather name="settings" size={16} color="#4f46e5" />
               </View>
               <Text className="text-slate-700 font-medium text-sm">Workspace Settings</Text>
             </View>
             <Feather name="chevron-right" size={16} color="#cbd5e1" />
           </TouchableOpacity>
-          <TouchableOpacity className="flex-row items-center justify-between p-4">
+          
+          <TouchableOpacity 
+            onPress={() => router.push('/privacy-policy')}
+            className="flex-row items-center justify-between p-4"
+          >
             <View className="flex-row items-center gap-3">
               <View className="w-8 h-8 rounded-full bg-slate-50 items-center justify-center">
-                <Feather name="help-circle" size={16} color="#64748b" />
+                <Feather name="shield" size={16} color="#64748b" />
               </View>
-              <Text className="text-slate-700 font-medium text-sm">Help & Support</Text>
+              <Text className="text-slate-700 font-medium text-sm">Privacy Policy</Text>
             </View>
             <Feather name="chevron-right" size={16} color="#cbd5e1" />
           </TouchableOpacity>

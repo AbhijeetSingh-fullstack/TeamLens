@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { supabase } from '../utils/supabase';
+import { useUser } from '@clerk/clerk-expo';
 
 type TeamInfo = {
   id: string;
@@ -17,6 +18,7 @@ type RoleInfo = {
 
 export default function JoinTeamScreen() {
   const router = useRouter();
+  const { user } = useUser();
   
   // Step 1 State
   const [teamCode, setTeamCode] = useState('');
@@ -27,6 +29,19 @@ export default function JoinTeamScreen() {
   // Step 2 State
   const [memberName, setMemberName] = useState('');
   const [memberEmail, setMemberEmail] = useState('');
+
+  useEffect(() => {
+    if (user) {
+      if (user.fullName) {
+        setMemberName(user.fullName);
+      } else if (user.firstName) {
+        setMemberName(`${user.firstName} ${user.lastName || ''}`.trim());
+      }
+      if (user.primaryEmailAddress) {
+        setMemberEmail(user.primaryEmailAddress.emailAddress);
+      }
+    }
+  }, [user]);
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
   const [isJoining, setIsJoining] = useState(false);
 

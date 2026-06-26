@@ -1,16 +1,26 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { supabase } from '../utils/supabase';
+import { useUser } from '@clerk/clerk-expo';
 
 export default function CreateTeamScreen() {
   const router = useRouter();
+  const { user } = useUser();
   const [teamName, setTeamName] = useState('');
   const [orgName, setOrgName] = useState('');
   const [managerName, setManagerName] = useState('');
   const [roles, setRoles] = useState<string[]>(['']);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (user?.fullName) {
+      setManagerName(user.fullName);
+    } else if (user?.firstName) {
+      setManagerName(`${user.firstName} ${user.lastName || ''}`.trim());
+    }
+  }, [user]);
 
   const handleAddRole = () => {
     setRoles([...roles, '']);
