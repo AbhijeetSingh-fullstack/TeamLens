@@ -523,8 +523,12 @@ export default function ManagerDashboard() {
                   <View key={member.id} className={`py-4 ${index !== members.length - 1 ? 'border-b border-slate-100' : ''}`}>
                     <View className="flex-row justify-between items-center mb-3">
                       <View className="flex-row items-center gap-3">
-                        <View className="w-10 h-10 rounded-full bg-indigo-100 items-center justify-center">
-                          <Text className="text-indigo-600 font-bold text-xs">{member.member_name.substring(0,2).toUpperCase()}</Text>
+                        <View className="w-10 h-10 rounded-full bg-indigo-100 items-center justify-center border-2 border-white overflow-hidden">
+                          <Image 
+                            source={{ uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(member.member_name)}&background=4f46e5&color=fff&size=100` }} 
+                            className="w-full h-full" 
+                            resizeMode="cover" 
+                          />
                         </View>
                         <Text className="text-slate-800 font-bold">{member.member_name}</Text>
                       </View>

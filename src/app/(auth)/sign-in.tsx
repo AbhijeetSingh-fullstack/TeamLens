@@ -2,12 +2,8 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, Link } from 'expo-router';
-import { useSignIn, useOAuth } from '@clerk/clerk-expo';
-import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
+import { useSignIn } from '@clerk/clerk-expo';
 import { Feather } from '@expo/vector-icons';
-
-WebBrowser.maybeCompleteAuthSession();
 
 export default function SignInScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
@@ -17,8 +13,6 @@ export default function SignInScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  const { startOAuthFlow } = useOAuth({ strategy: 'oauth_google' });
 
   const onSignInPress = async () => {
     if (!isLoaded) return;
@@ -32,7 +26,9 @@ export default function SignInScreen() {
 
       if (signInAttempt.status === 'complete') {
         await setActive({ session: signInAttempt.createdSessionId });
-        router.replace('/');
+        setTimeout(() => {
+          router.replace('/');
+        }, 100);
       } else {
         setError('Complete sign in action required.');
       }
@@ -40,21 +36,6 @@ export default function SignInScreen() {
       setError(err.errors?.[0]?.longMessage || 'An error occurred during sign in');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const onSignInWithGoogle = async () => {
-    try {
-      const { createdSessionId, setActive: setOAuthActive } = await startOAuthFlow({
-        redirectUrl: Linking.createURL('/'),
-      });
-      if (createdSessionId && setOAuthActive) {
-        await setOAuthActive({ session: createdSessionId });
-        router.replace('/');
-      }
-    } catch (err: any) {
-      console.error('OAuth error:', JSON.stringify(err, null, 2));
-      setError('Failed to sign in with Google');
     }
   };
 
@@ -104,11 +85,14 @@ export default function SignInScreen() {
 
               {error ? <Text className="text-red-500 text-sm mt-1">{error}</Text> : null}
 
-              <TouchableOpacity 
-                onPress={onSignInPress} 
-                disabled={loading}
-                className={`w-full py-4 rounded-xl items-center shadow-sm mt-4 ${loading ? 'bg-indigo-400' : 'bg-indigo-600'}`}
-              >
+                <TouchableOpacity 
+                  onPress={onSignInPress} 
+                  disabled={loading}
+                  style={[
+                    { width: '100%', paddingVertical: 16, borderRadius: 12, alignItems: 'center', marginTop: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2 },
+                    { backgroundColor: loading ? '#818cf8' : '#4f46e5' }
+                  ]}
+                >
                 {loading ? (
                   <ActivityIndicator color="white" />
                 ) : (
@@ -116,20 +100,6 @@ export default function SignInScreen() {
                 )}
               </TouchableOpacity>
             </View>
-
-            <View className="flex-row items-center my-6">
-              <View className="flex-1 h-[1px] bg-slate-200" />
-              <Text className="px-4 text-slate-400 font-medium">OR</Text>
-              <View className="flex-1 h-[1px] bg-slate-200" />
-            </View>
-
-            <TouchableOpacity 
-              onPress={onSignInWithGoogle}
-              className="w-full py-4 rounded-xl items-center flex-row justify-center border border-slate-200 bg-white shadow-sm"
-            >
-              <Feather name="globe" size={20} color="#3b82f6" style={{ marginRight: 10 }} />
-              <Text className="text-slate-700 font-bold text-base">Continue with Google</Text>
-            </TouchableOpacity>
           </View>
 
           <View className="flex-row justify-center mt-4">

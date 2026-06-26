@@ -11,6 +11,7 @@ export default function CreateTeamScreen() {
   const [teamName, setTeamName] = useState('');
   const [orgName, setOrgName] = useState('');
   const [managerName, setManagerName] = useState('');
+  const [workspacePassword, setWorkspacePassword] = useState('');
   const [roles, setRoles] = useState<string[]>(['']);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -38,7 +39,7 @@ export default function CreateTeamScreen() {
   };
 
   const handleCreateTeam = async () => {
-    if (!teamName || !orgName || !managerName) {
+    if (!teamName || !orgName || !managerName || !workspacePassword) {
       alert("Please fill in all required fields.");
       return;
     }
@@ -69,7 +70,8 @@ export default function CreateTeamScreen() {
           organization_id: orgData.id, 
           team_name: teamName, 
           manager_name: managerName,
-          team_code: generatedCode
+          team_code: generatedCode,
+          workspace_password: workspacePassword
         }])
         .select()
         .single();
@@ -90,6 +92,15 @@ export default function CreateTeamScreen() {
         if (rolesError) throw rolesError;
       }
 
+      // 4. Save to local storage for auto-login using the current user's ID
+      if (user) {
+        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+        await AsyncStorage.setItem(`manager_team_${user.id}`, JSON.stringify({
+          teamCode: generatedCode,
+          teamName: teamName
+        }));
+      }
+
       router.push({
         pathname: '/(manager-tabs)/dashboard',
         params: { teamCode: generatedCode, teamName: teamName }
@@ -103,10 +114,11 @@ export default function CreateTeamScreen() {
 
   const [isTestLogin, setIsTestLogin] = useState(false);
   const [testLoginCode, setTestLoginCode] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
 
   const handleTestLogin = async () => {
-    if (!testLoginCode) {
-      alert("Please enter a team code.");
+    if (!testLoginCode || !loginPassword) {
+      alert("Please enter both team code and password.");
       return;
     }
     setIsSubmitting(true);
@@ -115,10 +127,19 @@ export default function CreateTeamScreen() {
         .from('teams')
         .select('*')
         .eq('team_code', testLoginCode.toUpperCase())
+        .eq('workspace_password', loginPassword)
         .single();
         
       if (error || !data) {
-        throw new Error("Team not found for code: " + testLoginCode);
+        throw new Error("Invalid team code or password.");
+      }
+
+      if (user) {
+        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+        await AsyncStorage.setItem(`manager_team_${user.id}`, JSON.stringify({
+          teamCode: data.team_code,
+          teamName: data.team_name
+        }));
       }
 
       router.push({
@@ -161,18 +182,18 @@ export default function CreateTeamScreen() {
               <View className="flex-row items-center gap-2 mb-3">
                 <Text className="text-indigo-600 text-xs font-semibold">Admin</Text>
                 <Text className="text-slate-400 text-xs">{'>'}</Text>
-                <Text className="text-slate-800 text-xs font-bold">{isTestLogin ? 'Test Login' : 'Add Team'}</Text>
+                <Text className="text-slate-800 text-xs font-bold">{isTestLogin ? 'Manager Login' : 'Add Team'}</Text>
               </View>
-              <Text className="text-2xl font-bold text-slate-800 mb-2">{isTestLogin ? 'Login to Team' : 'New Team Setup'}</Text>
+              <Text className="text-2xl font-bold text-slate-800 mb-2">{isTestLogin ? 'Sign in to existing workspace' : 'New Team Setup'}</Text>
               <Text className="text-slate-500 text-sm leading-5">
-                {isTestLogin ? 'Quickly bypass to an existing team dashboard for testing.' : 'Configure the workspace environment for a new team entity within your network.'}
+                {isTestLogin ? 'Log back into a workspace you created using your team code and password.' : 'Configure the workspace environment for a new team entity within your network.'}
               </Text>
             </View>
             <TouchableOpacity 
               onPress={() => setIsTestLogin(!isTestLogin)}
               className="bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-100"
             >
-              <Text className="text-indigo-600 text-[10px] font-bold">{isTestLogin ? 'Create Mode' : 'Test Login'}</Text>
+              <Text className="text-indigo-600 text-[10px] font-bold">{isTestLogin ? 'Create Mode' : 'Manager Login'}</Text>
             </TouchableOpacity>
           </View>
 
@@ -183,8 +204,10 @@ export default function CreateTeamScreen() {
                 <View className="bg-green-50 w-10 h-10 rounded-xl items-center justify-center">
                   <Text className="text-green-600 font-bold text-lg">🔑</Text>
                 </View>
-                <Text className="text-slate-800 font-medium">Testing: Enter Existing Team Code</Text>
+                <Text className="text-slate-800 font-medium">Workspace Login</Text>
               </View>
+              
+              <Text className="text-slate-500 text-sm mb-2">Team Code</Text>
               <TextInput
                 value={testLoginCode}
                 onChangeText={setTestLoginCode}
@@ -193,6 +216,17 @@ export default function CreateTeamScreen() {
                 className="w-full bg-[#F4F5FA] border border-slate-200/60 rounded-xl px-4 py-3 text-slate-800 mb-4"
                 placeholderTextColor="#94a3b8"
               />
+
+              <Text className="text-slate-500 text-sm mb-2">Workspace Password</Text>
+              <TextInput
+                value={loginPassword}
+                onChangeText={setLoginPassword}
+                placeholder="Enter workspace password"
+                secureTextEntry
+                className="w-full bg-[#F4F5FA] border border-slate-200/60 rounded-xl px-4 py-3 text-slate-800 mb-6"
+                placeholderTextColor="#94a3b8"
+              />
+
               <TouchableOpacity 
                 onPress={handleTestLogin}
                 disabled={isSubmitting}
@@ -249,6 +283,19 @@ export default function CreateTeamScreen() {
                       value={managerName}
                       onChangeText={setManagerName}
                       placeholder="Search by name or email..."
+                      className="w-full bg-[#F4F5FA] border border-slate-200/60 rounded-xl px-4 py-3 text-slate-800"
+                      placeholderTextColor="#94a3b8"
+                    />
+                  </View>
+
+                  {/* Workspace Password */}
+                  <View>
+                    <Text className="text-slate-500 text-sm mb-2">Workspace Password</Text>
+                    <TextInput
+                      value={workspacePassword}
+                      onChangeText={setWorkspacePassword}
+                      placeholder="Set a password for your workspace"
+                      secureTextEntry
                       className="w-full bg-[#F4F5FA] border border-slate-200/60 rounded-xl px-4 py-3 text-slate-800"
                       placeholderTextColor="#94a3b8"
                     />

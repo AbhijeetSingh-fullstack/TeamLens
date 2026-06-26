@@ -1,12 +1,14 @@
 import { View, Text, TouchableOpacity, StatusBar, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, Redirect } from 'expo-router';
+import { useRouter, useGlobalSearchParams, useSegments } from 'expo-router';
 import { useAuth, useClerk, useUser } from '@clerk/clerk-expo';
 import { useEffect, useState } from 'react';
 import { supabase } from '../utils/supabase';
 
 export default function WelcomeScreen() {
   const router = useRouter();
+  const segments = useSegments();
+  const { skipAutoLogin } = useGlobalSearchParams<{ skipAutoLogin?: string }>();
   const { isSignedIn, isLoaded } = useAuth();
   const { user } = useUser();
   const { signOut } = useClerk();
@@ -16,46 +18,49 @@ export default function WelcomeScreen() {
   useEffect(() => {
     async function checkAutoLogin() {
       if (!isLoaded) return;
-      if (!isSignedIn || !user) {
+      if (!isSignedIn || !user || skipAutoLogin === 'true') {
         setIsCheckingAutoLogin(false);
         return;
       }
 
       try {
-        // 1. Check if they are an active team member
-        const { data: memberData } = await supabase
-          .from('team_members')
-          .select('team_id, member_name, id, status, teams(team_code, team_name)')
-          .eq('user_id', user.id)
-          .single();
+        // 1. Check if they are an active team member using AsyncStorage
+        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+        const memberDataStr = await AsyncStorage.getItem(`member_team_${user.id}`);
+        
+        if (memberDataStr) {
+          const { memberId } = JSON.parse(memberDataStr);
+          
+          const { data: memberData } = await supabase
+            .from('team_members')
+            .select('team_id, member_name, id, status, teams(team_code, team_name)')
+            .eq('id', memberId)
+            .single();
 
-        if (memberData && memberData.teams && memberData.status !== 'rejected') {
-          router.replace({
-            pathname: '/(member-tabs)/dashboard',
-            params: {
-              teamName: memberData.teams.team_name,
-              memberName: memberData.member_name,
-              memberId: memberData.id,
-              teamId: memberData.team_id
-            }
-          });
-          return;
+          if (memberData && memberData.teams && memberData.status !== 'rejected') {
+            router.replace({
+              pathname: '/(member-tabs)/dashboard',
+              params: {
+                teamName: memberData.teams.team_name,
+                memberName: memberData.member_name,
+                memberId: memberData.id,
+                teamId: memberData.team_id
+              }
+            });
+            return;
+          }
         }
 
-        // 2. Check if they are a manager (by matching their full name as a fallback since there's no manager_id)
-        const userFullName = user.fullName || `${user.firstName} ${user.lastName || ''}`.trim();
-        const { data: managerData } = await supabase
-          .from('teams')
-          .select('*')
-          .eq('manager_name', userFullName)
-          .single();
-
-        if (managerData) {
+        // 2. Check if they are a manager using AsyncStorage (since name matching is insecure)
+        const managerDataStr = await AsyncStorage.getItem(`manager_team_${user.id}`);
+        
+        if (managerDataStr) {
+          const managerData = JSON.parse(managerDataStr);
           router.replace({
             pathname: '/(manager-tabs)/dashboard',
             params: {
-              teamCode: managerData.team_code,
-              teamName: managerData.team_name
+              teamCode: managerData.teamCode,
+              teamName: managerData.teamName
             }
           });
           return;
@@ -71,17 +76,22 @@ export default function WelcomeScreen() {
     checkAutoLogin();
   }, [isLoaded, isSignedIn, user]);
 
-  if (!isLoaded || isCheckingAutoLogin) {
+  useEffect(() => {
+    // Only redirect from the root index page!
+    // If segments.length > 0, we are already on another screen (like /sign-up)
+    const isRoot = segments.length === 0;
+    
+    if (isLoaded && !isCheckingAutoLogin && !isSignedIn && isRoot) {
+      router.replace('/(auth)/sign-in');
+    }
+  }, [isLoaded, isCheckingAutoLogin, isSignedIn, segments]);
+
+  if (!isLoaded || isCheckingAutoLogin || !isSignedIn) {
     return (
       <View className="flex-1 justify-center items-center bg-[#F5F7FF]">
         <ActivityIndicator size="large" color="#4f46e5" />
       </View>
     );
-  }
-
-  // If not signed in, directly redirect to the login page
-  if (!isSignedIn) {
-    return <Redirect href="/(auth)/sign-in" />;
   }
 
   return (

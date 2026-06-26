@@ -98,17 +98,27 @@ export default function JoinTeamScreen() {
 
       // Insert member into team_members table
       // Note: This will likely fail with a user_id constraint error since we don't have auth yet.
-      const { error: joinError } = await supabase
+      const { data: insertedMember, error: joinError } = await supabase
         .from('team_members')
         .insert([{
           team_id: teamInfo.id,
           member_name: memberName,
           role_id: selectedRoleId,
-          status: 'pending'
-        }]);
+          status: 'pending',
+          profile_image_url: user?.imageUrl
+        }])
+        .select()
+        .single();
 
       if (joinError) {
         throw new Error(joinError.message);
+      }
+
+      if (user && insertedMember) {
+        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+        await AsyncStorage.setItem(`member_team_${user.id}`, JSON.stringify({
+          memberId: insertedMember.id
+        }));
       }
 
       // Route to pending approval screen

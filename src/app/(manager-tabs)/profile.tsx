@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, ScrollView, StatusBar, Image, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StatusBar, Image, Alert, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useGlobalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -90,22 +90,10 @@ export default function ManagerProfile() {
     fetchData();
   }, [teamCode]);
 
+  const [isExitModalVisible, setIsExitModalVisible] = useState(false);
+
   const handleSignOut = () => {
-    Alert.alert(
-      "Sign Out",
-      "Are you sure you want to log out of the manager dashboard?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Sign Out", 
-          style: "destructive",
-          onPress: async () => {
-            await signOut();
-            router.replace('/');
-          }
-        }
-      ]
-    );
+    setIsExitModalVisible(true);
   };
 
   return (
@@ -116,29 +104,20 @@ export default function ManagerProfile() {
         {/* Header */}
         <View className="flex-row items-center justify-between mb-8">
           <Text className="text-xl font-bold text-slate-800">Profile</Text>
-          <TouchableOpacity onPress={handleSignOut} className="w-10 h-10 bg-white rounded-full items-center justify-center border border-slate-200 shadow-sm">
-            <Feather name="log-out" size={18} color="#ef4444" />
-          </TouchableOpacity>
         </View>
 
         {/* Profile Card */}
         <View className="bg-white rounded-[24px] p-6 shadow-sm border border-slate-100 items-center mb-6">
           <View className="w-24 h-24 rounded-full bg-slate-200 overflow-hidden border-4 border-indigo-50 mb-4 relative">
-             <Image source={{ uri: user?.imageUrl || `https://ui-avatars.com/api/?name=${user?.firstName || managerName}&background=4f46e5&color=fff&size=200` }} className="w-full h-full" />
+             <Image source={{ uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(managerName || user?.fullName || 'Manager')}&background=4f46e5&color=fff&size=200` }} className="w-full h-full" />
           </View>
-          <Text className="text-2xl font-bold text-slate-800 mb-1">{user?.fullName || managerName}</Text>
+          <Text className="text-2xl font-bold text-slate-800 mb-1">{managerName || user?.fullName}</Text>
           <View className="bg-emerald-50 px-3 py-1 rounded-full mb-4 border border-emerald-100 flex-row items-center gap-1">
             <Feather name="shield" size={12} color="#10b981" />
             <Text className="text-emerald-600 font-bold text-xs uppercase tracking-wider">Creator</Text>
           </View>
           
-          <TouchableOpacity 
-            onPress={() => router.push('/edit-profile')}
-            className="flex-row items-center gap-2 bg-slate-50 px-4 py-2 rounded-xl border border-slate-200"
-          >
-            <Feather name="edit-2" size={14} color="#475569" />
-            <Text className="text-slate-600 font-bold text-xs">Edit Profile</Text>
-          </TouchableOpacity>
+
         </View>
 
         {/* Workspace Info */}
@@ -205,7 +184,7 @@ export default function ManagerProfile() {
           
           <TouchableOpacity 
             onPress={() => router.push('/privacy-policy')}
-            className="flex-row items-center justify-between p-4"
+            className="flex-row items-center justify-between p-4 border-b border-slate-50"
           >
             <View className="flex-row items-center gap-3">
               <View className="w-8 h-8 rounded-full bg-slate-50 items-center justify-center">
@@ -215,9 +194,53 @@ export default function ManagerProfile() {
             </View>
             <Feather name="chevron-right" size={16} color="#cbd5e1" />
           </TouchableOpacity>
+          
+          <TouchableOpacity 
+            onPress={handleSignOut}
+            className="flex-row items-center justify-between p-4"
+          >
+            <View className="flex-row items-center gap-3">
+              <View className="w-8 h-8 rounded-full bg-red-50 items-center justify-center">
+                <Feather name="log-out" size={16} color="#ef4444" />
+              </View>
+              <Text className="text-red-600 font-bold text-sm">Exit Team</Text>
+            </View>
+            <Feather name="chevron-right" size={16} color="#cbd5e1" />
+          </TouchableOpacity>
         </View>
 
       </ScrollView>
+
+      {/* Exit Team Modal */}
+      <Modal visible={isExitModalVisible} transparent animationType="fade">
+        <View className="flex-1 bg-black/50 items-center justify-center p-6">
+          <View className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-xl">
+            <View className="w-12 h-12 bg-red-50 rounded-full items-center justify-center mb-4">
+              <Feather name="log-out" size={24} color="#ef4444" />
+            </View>
+            <Text className="text-xl font-bold text-slate-800 mb-2">Leave Team</Text>
+            <Text className="text-slate-500 mb-6 leading-6">Do you want to leave this team and return to the onboarding screen?</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginTop: 8 }}>
+              <TouchableOpacity 
+                style={{ flex: 1, backgroundColor: '#f1f5f9', paddingVertical: 12, borderRadius: 12, alignItems: 'center', marginRight: 8 }}
+                onPress={() => setIsExitModalVisible(false)}
+              >
+                <Text style={{ color: '#475569', fontWeight: 'bold' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={{ flex: 1, backgroundColor: '#dc2626', paddingVertical: 12, borderRadius: 12, alignItems: 'center', marginLeft: 8 }}
+                onPress={() => {
+                  setIsExitModalVisible(false);
+                  router.replace({ pathname: '/', params: { skipAutoLogin: 'true' } });
+                }}
+              >
+                <Text style={{ color: '#ffffff', fontWeight: 'bold' }}>Yes, Leave</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
