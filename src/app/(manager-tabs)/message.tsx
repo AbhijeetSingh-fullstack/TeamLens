@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, FlatList, StatusBar, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, StatusBar, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useGlobalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -96,10 +96,14 @@ export default function ManagerMessageScreen() {
       }`}
     >
       <View className="flex-row items-center gap-3">
-        <View className={`w-12 h-12 rounded-full items-center justify-center ${
+        <View className={`w-12 h-12 rounded-full overflow-hidden items-center justify-center ${
           unreadMap[item.id] ? 'bg-white border border-indigo-100' : 'bg-slate-50 border border-slate-100'
         }`}>
-          <Feather name="user" size={20} color={unreadMap[item.id] ? "#4f46e5" : "#64748b"} />
+          {item.profile_image_url ? (
+            <Image source={{ uri: item.profile_image_url }} className="w-full h-full" resizeMode="cover" />
+          ) : (
+            <Image source={{ uri: `https://ui-avatars.com/api/?name=${item.member_name}&background=4f46e5&color=fff` }} className="w-full h-full" resizeMode="cover" />
+          )}
         </View>
         <View>
           <View className="flex-row items-center">

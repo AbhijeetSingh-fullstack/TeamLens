@@ -77,7 +77,7 @@ export default function ManagerDashboard() {
 
           const { data: membersData } = await supabase
             .from('team_members')
-            .select('*, roles(role_name)')
+            .select('*, roles(role_name), profile_image_url')
             .eq('team_id', teamData.id);
 
           if (membersData) {
@@ -139,7 +139,7 @@ export default function ManagerDashboard() {
               completed_at,
               submission_notes,
               tasks!inner(title, team_id),
-              team_members(member_name)
+              team_members(member_name, profile_image_url)
             `)
             .eq('status', 'completed')
             .eq('tasks.team_id', teamData.id)
@@ -386,8 +386,12 @@ export default function ManagerDashboard() {
                 className={`flex-row items-center px-5 py-4 ${index !== members.length - 1 ? 'border-b border-slate-100' : ''}`}
               >
                 <View className="flex-1 flex-row items-center gap-3">
-                  <View className="w-10 h-10 rounded-full bg-indigo-100 items-center justify-center">
-                    <Text className="text-indigo-600 font-bold text-xs">{member.member_name.substring(0,2).toUpperCase()}</Text>
+                  <View className="w-8 h-8 rounded-full bg-indigo-100 items-center justify-center border-2 border-white overflow-hidden">
+                    {member.profile_image_url ? (
+                      <Image source={{ uri: member.profile_image_url }} className="w-full h-full" resizeMode="cover" />
+                    ) : (
+                      <Image source={{ uri: `https://ui-avatars.com/api/?name=${member.member_name}&background=4f46e5&color=fff` }} className="w-full h-full" resizeMode="cover" />
+                    )}
                   </View>
                   <View>
                     <Text className="text-slate-800 font-bold text-sm">{member.member_name}</Text>
