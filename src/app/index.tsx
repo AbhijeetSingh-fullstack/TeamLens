@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StatusBar, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StatusBar, ScrollView, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useGlobalSearchParams, useSegments } from 'expo-router';
 import { useAuth, useClerk, useUser } from '@clerk/clerk-expo';
@@ -107,9 +107,11 @@ export default function WelcomeScreen() {
         {/* Header / Logo */}
         <View className="items-center mb-8">
           <View className="flex-row items-center gap-3">
-            <View className="w-10 h-10 bg-indigo-600 rounded-xl items-center justify-center shadow-sm">
-              <Text className="text-white font-extrabold text-lg">⚡</Text>
-            </View>
+            <Image 
+              source={require('../../assets/images/TeamLens.png')} 
+              style={{ width: 40, height: 40, borderRadius: 12 }}
+              resizeMode="contain"
+            />
             <Text className="text-2xl font-bold text-slate-800">TeamLens</Text>
           </View>
         </View>

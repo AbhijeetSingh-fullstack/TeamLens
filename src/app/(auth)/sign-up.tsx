@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, ScrollView, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, Link } from 'expo-router';
 import { useSignUp } from '@clerk/clerk-expo';
@@ -13,7 +13,9 @@ export default function SignUpScreen() {
   const [lastName, setLastName] = useState('');
   const [emailAddress, setEmailAddress] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [pendingVerification, setPendingVerification] = useState(false);
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -80,9 +82,11 @@ export default function SignUpScreen() {
         <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }}>
           
           <View className="mb-8 items-center">
-            <View className="w-16 h-16 bg-indigo-600 rounded-2xl items-center justify-center mb-6 shadow-sm">
-              <Text className="text-white font-extrabold text-2xl">TL</Text>
-            </View>
+            <Image 
+              source={require('../../../assets/images/TeamLens.png')} 
+              style={{ width: 64, height: 64, borderRadius: 16, marginBottom: 24 }}
+              resizeMode="contain"
+            />
             <Text className="text-3xl font-extrabold text-slate-900 mb-3 tracking-tight">Create Account</Text>
             <Text className="text-slate-500 text-base text-center">
               {pendingVerification ? 'Verify your email address' : 'Join TeamLens and manage your workspace'}
@@ -129,26 +133,42 @@ export default function SignUpScreen() {
 
                 <View>
                   <Text className="text-slate-600 text-sm font-medium mb-2 ml-1">Password</Text>
-                  <TextInput
-                    value={password}
-                    placeholder="Create a password"
-                    placeholderTextColor="#94a3b8"
-                    secureTextEntry={true}
-                    onChangeText={setPassword}
-                    className="w-full bg-[#F4F5FA] border border-slate-200/60 rounded-xl px-4 py-4 text-slate-800 text-base"
-                  />
+                  <View className="relative justify-center">
+                    <TextInput
+                      value={password}
+                      placeholder="Create a password"
+                      placeholderTextColor="#94a3b8"
+                      secureTextEntry={!showPassword}
+                      onChangeText={setPassword}
+                      className="w-full bg-[#F4F5FA] border border-slate-200/60 rounded-xl px-4 py-4 pr-12 text-slate-800 text-base"
+                    />
+                    <TouchableOpacity 
+                      className="absolute right-4"
+                      onPress={() => setShowPassword(!showPassword)}
+                    >
+                      <Feather name={showPassword ? "eye" : "eye-off"} size={20} color="#94a3b8" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
                 <View>
                   <Text className="text-slate-600 text-sm font-medium mb-2 ml-1">Confirm Password</Text>
-                  <TextInput
-                    value={confirmPassword}
-                    placeholder="Confirm password"
-                    placeholderTextColor="#94a3b8"
-                    secureTextEntry={true}
-                    onChangeText={setConfirmPassword}
-                    className="w-full bg-[#F4F5FA] border border-slate-200/60 rounded-xl px-4 py-4 text-slate-800 text-base"
-                  />
+                  <View className="relative justify-center">
+                    <TextInput
+                      value={confirmPassword}
+                      placeholder="Confirm password"
+                      placeholderTextColor="#94a3b8"
+                      secureTextEntry={!showConfirmPassword}
+                      onChangeText={setConfirmPassword}
+                      className="w-full bg-[#F4F5FA] border border-slate-200/60 rounded-xl px-4 py-4 pr-12 text-slate-800 text-base"
+                    />
+                    <TouchableOpacity 
+                      className="absolute right-4"
+                      onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                    >
+                      <Feather name={showConfirmPassword ? "eye" : "eye-off"} size={20} color="#94a3b8" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
                 {error ? <Text className="text-red-500 text-sm mt-1">{error}</Text> : null}

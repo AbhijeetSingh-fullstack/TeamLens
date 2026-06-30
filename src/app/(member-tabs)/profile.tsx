@@ -59,6 +59,17 @@ export default function MemberProfile() {
   const confirmExitTeam = async () => {
     setIsExitModalVisible(false);
     try {
+      // Fetch team_id directly from DB just to be absolutely sure we have it
+      const { data: memberData } = await supabase.from('team_members').select('team_id').eq('id', memberId).single();
+      const actualTeamId = memberData?.team_id || teamId;
+      
+      if (actualTeamId) {
+        await supabase.from('activities').insert({
+          team_id: actualTeamId,
+          action: `UserLeft:${memberName || user?.fullName || 'A member'}`
+        });
+      }
+
       const { error } = await supabase
         .from('team_members')
         .delete()

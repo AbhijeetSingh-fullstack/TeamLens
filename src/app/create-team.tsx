@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, StatusBar } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, ScrollView, StatusBar, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { supabase } from '../utils/supabase';
@@ -160,9 +160,11 @@ export default function CreateTeamScreen() {
       {/* Header Bar */}
       <View className="px-6 py-4 flex-row items-center justify-between border-b border-slate-200/50 bg-white">
         <View className="flex-row items-center gap-3">
-          <View className="w-8 h-8 bg-indigo-600 rounded-lg items-center justify-center">
-            <Text className="text-white font-bold text-xs">TL</Text>
-          </View>
+          <Image 
+            source={require('../../assets/images/TeamLens.png')} 
+            style={{ width: 32, height: 32, borderRadius: 8 }}
+            resizeMode="contain"
+          />
           <Text className="text-lg font-bold text-slate-900">TeamLens</Text>
         </View>
         <TouchableOpacity onPress={() => router.back()}>

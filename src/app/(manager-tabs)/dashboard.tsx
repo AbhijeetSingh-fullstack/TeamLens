@@ -27,6 +27,7 @@ export default function ManagerDashboard() {
   const [members, setMembers] = useState<Member[]>([]);
   const [pendingMembers, setPendingMembers] = useState<Member[]>([]);
   const [recentCompletions, setRecentCompletions] = useState<any[]>([]);
+  const [leftMembers, setLeftMembers] = useState<any[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
   const [teamId, setTeamId] = useState<string | null>(null);
   const [isLocked, setIsLocked] = useState(false);
@@ -37,6 +38,7 @@ export default function ManagerDashboard() {
   const [showManageTeam, setShowManageTeam] = useState(false);
   const [newRoleName, setNewRoleName] = useState('');
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
+  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
 
   // Poll for new members and roles
   useEffect(() => {
@@ -151,6 +153,43 @@ export default function ManagerDashboard() {
             const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).getTime();
             const recent = completionsData.filter(c => c.completed_at && new Date(c.completed_at).getTime() > oneDayAgo);
             setRecentCompletions(recent);
+            
+            // Fetch members left activities
+            const { data: actsData } = await supabase
+              .from('activities')
+              .select('*')
+              .eq('team_id', teamData.id)
+              .like('action', 'UserLeft:%')
+              .order('created_at', { ascending: false })
+              .limit(5);
+              
+            const recentLeft = (actsData || []).filter(a => new Date(a.created_at).getTime() > oneDayAgo);
+            setLeftMembers(recentLeft);
+            
+            // Check for unread notifications
+            const storedSeen = await AsyncStorage.getItem('manager_lastSeenNotifications');
+            const lastSeen = storedSeen ? parseInt(storedSeen) : 0;
+            
+            let latestNotificationTime = 0;
+            membersData.filter(m => m.status === 'pending').forEach(m => {
+              const stamp = m.created_at || m.joined_at;
+              if (stamp) {
+                const t = new Date(stamp).getTime();
+                if (t > latestNotificationTime) latestNotificationTime = t;
+              }
+            });
+            recent.forEach(c => {
+              if (c.completed_at) {
+                const t = new Date(c.completed_at).getTime();
+                if (t > latestNotificationTime) latestNotificationTime = t;
+              }
+            });
+            recentLeft.forEach(a => {
+              const t = new Date(a.created_at).getTime();
+              if (t > latestNotificationTime) latestNotificationTime = t;
+            });
+            
+            setHasUnreadNotifications(latestNotificationTime > lastSeen);
           }
 
         }
@@ -257,10 +296,14 @@ export default function ManagerDashboard() {
           <View className="flex-row items-center gap-4">
             <TouchableOpacity 
               className="w-10 h-10 items-center justify-center relative"
-              onPress={() => setShowNotifications(true)}
+              onPress={async () => {
+                setShowNotifications(true);
+                setHasUnreadNotifications(false);
+                await AsyncStorage.setItem('manager_lastSeenNotifications', Date.now().toString());
+              }}
             >
               <Feather name="bell" size={24} color="#4f46e5" />
-              {(pendingMembers.length > 0 || recentCompletions.length > 0) && (
+              {hasUnreadNotifications && (
                 <View className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
               )}
             </TouchableOpacity>
@@ -418,7 +461,7 @@ export default function ManagerDashboard() {
               </TouchableOpacity>
             </View>
 
-            {pendingMembers.length === 0 && recentCompletions.length === 0 ? (
+            {pendingMembers.length === 0 && recentCompletions.length === 0 && leftMembers.length === 0 ? (
               <View className="items-center justify-center py-10">
                 <Text className="text-slate-400">No new notifications</Text>
               </View>
@@ -464,6 +507,17 @@ export default function ManagerDashboard() {
                         <Text className="text-slate-700 italic text-sm">"{completion.submission_notes}"</Text>
                       </View>
                     ) : null}
+                  </View>
+                ))}
+
+                {leftMembers.map(activity => (
+                  <View key={activity.id} className="bg-red-50 border border-red-100 rounded-2xl p-4 mb-4">
+                    <View className="flex-row items-center gap-2 mb-1">
+                      <Feather name="user-minus" size={14} color="#ef4444" />
+                      <Text className="text-red-600 font-bold text-xs uppercase tracking-wider">Member Left</Text>
+                    </View>
+                    <Text className="text-slate-800 font-bold text-base mb-1">{activity.action.split(':')[1]}</Text>
+                    <Text className="text-slate-600 text-sm">This member has left the team and their data has been cleared.</Text>
                   </View>
                 ))}
               </ScrollView>

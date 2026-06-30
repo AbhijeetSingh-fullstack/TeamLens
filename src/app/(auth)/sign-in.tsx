@@ -11,6 +11,7 @@ export default function SignInScreen() {
 
   const [emailAddress, setEmailAddress] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -48,9 +49,11 @@ export default function SignInScreen() {
         <View className="flex-1 px-6 pt-10 pb-6 justify-center">
           
           <View className="mb-10 items-center">
-            <View className="w-16 h-16 bg-indigo-600 rounded-2xl items-center justify-center mb-6 shadow-sm">
-              <Text className="text-white font-extrabold text-2xl">TL</Text>
-            </View>
+            <Image 
+              source={require('../../../assets/images/TeamLens.png')} 
+              style={{ width: 64, height: 64, borderRadius: 16, marginBottom: 24 }}
+              resizeMode="contain"
+            />
             <Text className="text-3xl font-extrabold text-slate-900 mb-3 tracking-tight">Welcome Back</Text>
             <Text className="text-slate-500 text-base text-center">
               Sign in to continue to your TeamLens dashboard
@@ -73,14 +76,30 @@ export default function SignInScreen() {
 
               <View>
                 <Text className="text-slate-600 text-sm font-medium mb-2 ml-1">Password</Text>
-                <TextInput
-                  value={password}
-                  placeholder="Enter your password"
-                  placeholderTextColor="#94a3b8"
-                  secureTextEntry={true}
-                  onChangeText={(password) => setPassword(password)}
-                  className="w-full bg-[#F4F5FA] border border-slate-200/60 rounded-xl px-4 py-4 text-slate-800 text-base"
-                />
+                <View className="relative justify-center">
+                  <TextInput
+                    value={password}
+                    placeholder="Enter your password"
+                    placeholderTextColor="#94a3b8"
+                    secureTextEntry={!showPassword}
+                    onChangeText={(password) => setPassword(password)}
+                    className="w-full bg-[#F4F5FA] border border-slate-200/60 rounded-xl px-4 py-4 pr-12 text-slate-800 text-base"
+                  />
+                  <TouchableOpacity 
+                    className="absolute right-4"
+                    onPress={() => setShowPassword(!showPassword)}
+                  >
+                    <Feather name={showPassword ? "eye" : "eye-off"} size={20} color="#94a3b8" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View className="flex-row justify-end">
+                <Link href="/(auth)/forgot-password" asChild>
+                  <TouchableOpacity>
+                    <Text className="text-indigo-600 text-sm font-medium">Forgot Password?</Text>
+                  </TouchableOpacity>
+                </Link>
               </View>
 
               {error ? <Text className="text-red-500 text-sm mt-1">{error}</Text> : null}
