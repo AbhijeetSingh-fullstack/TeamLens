@@ -4,9 +4,12 @@ import { useState, useCallback } from 'react';
 import { supabase } from '../../utils/supabase';
 import { useGlobalSearchParams, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { useUser } from '@clerk/clerk-expo';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function ManagerAnalytics() {
   const { teamCode } = useGlobalSearchParams<{ teamCode: string }>();
+  const { user } = useUser();
   const [loading, setLoading] = useState(true);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [monthlyStats, setMonthlyStats] = useState({ assigned: 0, completed: 0, revisions: 0 });
@@ -15,94 +18,76 @@ export default function ManagerAnalytics() {
 
   useFocusEffect(
     useCallback(() => {
-      if (teamCode) {
-        fetchAnalytics();
-        const interval = setInterval(fetchAnalytics, 5000);
-        return () => clearInterval(interval);
-      }
-    }, [teamCode])
+      fetchAnalytics();
+      const interval = setInterval(fetchAnalytics, 5000);
+      return () => clearInterval(interval);
+    }, [teamCode, user?.id])
   );
 
   const fetchAnalytics = async () => {
     try {
-      const { data: teamData } = await supabase.from('teams').select('id').eq('team_code', teamCode).single();
+      let currentTeamCode = teamCode;
+      
+      if (!currentTeamCode) {
+        if (user) {
+          const managerDataStr = await AsyncStorage.getItem(`manager_team_${user.id}`);
+          if (managerDataStr) {
+            const managerData = JSON.parse(managerDataStr);
+            currentTeamCode = managerData.teamCode;
+          }
+        }
+        
+        if (!currentTeamCode) {
+          setLoading(false);
+          return;
+        }
+      }
+
+      const { data: teamData } = await supabase.from('teams').select('id').eq('team_code', currentTeamCode).single();
       if (!teamData) return;
 
       const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
+      const month_year = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-      // The start of today (to only count tasks finished before today for points)
-      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-
-      // Get all tasks for this month to count assigned
-      const { data: allTasks } = await supabase
-        .from('tasks')
-        .select('id, created_at, status')
-        .eq('team_id', teamData.id)
-        .gte('created_at', startOfMonth)
-        .lte('created_at', endOfMonth);
-
-      // Get all task assignments with completed_at for leaderboard
-      const { data: assignments } = await supabase
-        .from('task_assignments')
+      // Get analytics from dedicated table
+      const { data: analyticsData, error } = await supabase
+        .from('task_analysis')
         .select(`
-          id, status, completed_at, revisions_count,
-          member_id,
-          tasks!inner(created_at, due_date, team_id),
+          *,
           team_members(member_name, roles(role_name))
         `)
-        .eq('tasks.team_id', teamData.id);
+        .eq('team_id', teamData.id)
+        .eq('month_year', month_year);
 
-      if (!assignments) return;
+      if (error) {
+        console.error("Task Analysis Error:", error);
+        throw error;
+      }
 
-      let assignedThisMonth = allTasks?.length || 0;
-      let completedThisMonth = allTasks?.filter(t => t.status === 'completed').length || 0;
-
+      let assignedThisMonth = 0;
+      let completedThisMonth = 0;
       let totalRevisions = 0;
-      assignments.forEach((a: any) => {
-        totalRevisions += (a.revisions_count || 0);
-        if (a.tasks?.category === 'Revision') totalRevisions += 1;
-      });
 
-      setMonthlyStats({ assigned: assignedThisMonth, completed: completedThisMonth, revisions: totalRevisions });
+      const sortedLeaderboard = (analyticsData || [])
+        .filter(a => a.team_members) // Ensure member exists
+        .map((a: any) => {
+          assignedThisMonth += (a.assigned_count || 0);
+          completedThisMonth += (a.completed_count || 0);
+          totalRevisions += (a.revisions_count || 0);
 
-      // Calculate Leaderboard
-      const pointsMap: Record<string, any> = {};
-
-      assignments.forEach((a: any) => {
-        const memberId = a.member_id;
-        if (!pointsMap[memberId]) {
-          pointsMap[memberId] = {
-            id: memberId,
+          return {
+            id: a.member_id,
             name: a.team_members?.member_name || 'Unknown',
             role: a.team_members?.roles?.role_name || '',
-            points: 0,
-            tasksCompleted: 0,
-            tasksAssigned: 0,
-            revisionsCount: 0
+            points: a.points || 0,
+            tasksCompleted: a.completed_count || 0,
+            tasksAssigned: a.assigned_count || 0,
+            revisionsCount: a.revisions_count || 0
           };
-        }
+        })
+        .sort((a, b) => b.points - a.points);
 
-        pointsMap[memberId].tasksAssigned += 1;
-
-        // 1. Deduct penalties immediately, regardless of completion status
-        let penalty = a.revisions_count || 0;
-        if (a.tasks?.category === 'Revision') penalty += 1;
-        
-        pointsMap[memberId].revisionsCount += penalty;
-        pointsMap[memberId].points -= penalty;
-
-        // 2. Add positive points ONLY if completed
-        if (a.status === 'completed' && a.completed_at && a.completed_at >= startOfMonth) {
-          if (a.tasks?.category !== 'Revision') {
-             pointsMap[memberId].points += 10;
-          }
-          pointsMap[memberId].tasksCompleted += 1;
-        }
-      });
-
-      const sortedLeaderboard = Object.values(pointsMap).sort((a: any, b: any) => b.points - a.points);
+      setMonthlyStats({ assigned: assignedThisMonth, completed: completedThisMonth, revisions: totalRevisions });
       setLeaderboard(sortedLeaderboard);
     } catch (e) {
       console.log("Analytics Error:", e);
@@ -111,11 +96,11 @@ export default function ManagerAnalytics() {
     }
   };
 
-  const maxGraphValue = Math.max(monthlyStats.assigned, monthlyStats.completed, monthlyStats.revisions, 1);
+  const maxGraphValue = Math.max(monthlyStats.assigned, monthlyStats.completed, monthlyStats.revisions, 1000);
   const maxBarHeight = 120;
-  const assignedHeightPx = Math.max((monthlyStats.assigned / maxGraphValue) * maxBarHeight, 20);
-  const completedHeightPx = Math.max((monthlyStats.completed / maxGraphValue) * maxBarHeight, 20);
-  const revisionsHeightPx = Math.max((monthlyStats.revisions / maxGraphValue) * maxBarHeight, 20);
+  const assignedHeightPx = monthlyStats.assigned > 0 ? Math.max((monthlyStats.assigned / maxGraphValue) * maxBarHeight, 4) : 0;
+  const completedHeightPx = monthlyStats.completed > 0 ? Math.max((monthlyStats.completed / maxGraphValue) * maxBarHeight, 4) : 0;
+  const revisionsHeightPx = monthlyStats.revisions > 0 ? Math.max((monthlyStats.revisions / maxGraphValue) * maxBarHeight, 4) : 0;
 
   return (
     <SafeAreaView className="flex-1 bg-[#F9F9FB]">

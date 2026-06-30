@@ -29,6 +29,7 @@ export default function MemberDashboard() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isNotificationsVisible, setNotificationsVisible] = useState(false);
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
+  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
 
   useEffect(() => {
     if (!teamId || !memberId) return;
@@ -111,12 +112,25 @@ export default function MemberDashboard() {
           id: a.id + '_rev',
           type: 'revision',
           action: `Revision requested for: ${a.tasks.title}`,
-          created_at: new Date().toISOString(), // Fallback time for revision
+          created_at: a.created_at, // Use assignment creation time so it doesn't change every poll
           taskTitle: a.tasks.title
         }));
 
       const allNotifs = [...revisionActs, ...newTaskActs].slice(0, 10);
       setNotifications(allNotifs);
+      
+      // Check for unread notifications
+      const storedSeen = await AsyncStorage.getItem('member_lastSeenNotifications');
+      const lastSeen = storedSeen ? parseInt(storedSeen) : 0;
+      
+      let latestNotificationTime = 0;
+      allNotifs.forEach(n => {
+        if (n.created_at) {
+          const t = new Date(n.created_at).getTime();
+          if (t > latestNotificationTime) latestNotificationTime = t;
+        }
+      });
+      setHasUnreadNotifications(latestNotificationTime > lastSeen);
 
       // Merge and sort
       const mergedActivities = [...(recentActs || []), ...newTaskActs]
@@ -182,10 +196,14 @@ export default function MemberDashboard() {
           <View className="flex-row items-center gap-4">
             <TouchableOpacity 
               className="relative w-10 h-10 items-center justify-center"
-              onPress={() => setNotificationsVisible(true)}
+              onPress={async () => {
+                setNotificationsVisible(true);
+                setHasUnreadNotifications(false);
+                await AsyncStorage.setItem('member_lastSeenNotifications', Date.now().toString());
+              }}
             >
               <Feather name="bell" size={24} color="#475569" />
-              {notifications.length > 0 && (
+              {hasUnreadNotifications && (
                 <View className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
               )}
             </TouchableOpacity>

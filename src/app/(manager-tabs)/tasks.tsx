@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../utils/supabase';
+import { updateTaskAnalysis } from '../../utils/analytics';
 
 const CATEGORIES = ['Update', 'New Project', 'Feature', 'Bug', 'Review', 'Revision'];
 
@@ -158,6 +159,11 @@ export default function ManagerTasks() {
 
       if (assignError) throw assignError;
 
+      // 3. Update analytics for each assigned member
+      for (const memberId of selectedMembers) {
+        await updateTaskAnalysis(teamData.id, memberId, { assigned: true });
+      }
+
       // Reset and close
       setModalVisible(false);
       setNewTask({ title: '', description: '', category: 'Update', priority: 'Medium' });
@@ -171,7 +177,7 @@ export default function ManagerTasks() {
     }
   };
 
-  const handleRequestRevision = async (assignmentId: string, currentRevisions: number, taskId: string) => {
+  const handleRequestRevision = async (assignmentId: string, currentRevisions: number, taskId: string, memberId: string, teamId: string) => {
     try {
       // Increment revisions_count and set status to revision
       const { error } = await supabase
@@ -186,6 +192,9 @@ export default function ManagerTasks() {
 
       // Also update parent task to open so it goes back to active
       await supabase.from('tasks').update({ status: 'open', completed_at: null }).eq('id', taskId);
+
+      // Update analytics (-1 pt per revision, count incremented upon completion)
+      await updateTaskAnalysis(teamId, memberId, { points: -1 });
 
       setDetailModalVisible(false);
       fetchTasksAndMembers();
@@ -550,7 +559,7 @@ export default function ManagerTasks() {
                       )}
 
                       <TouchableOpacity
-                        onPress={() => handleRequestRevision(assign.id, assign.revisions_count || 0, selectedTask.id)}
+                        onPress={() => handleRequestRevision(assign.id, assign.revisions_count || 0, selectedTask.id, assign.member_id, selectedTask.team_id)}
                         className="mt-2 bg-red-50 border border-red-100 py-3 rounded-xl items-center flex-row justify-center gap-2"
                       >
                         <Feather name="refresh-ccw" size={16} color="#ef4444" />

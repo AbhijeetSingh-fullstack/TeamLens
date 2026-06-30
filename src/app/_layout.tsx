@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ClerkProvider, ClerkLoaded } from '@clerk/clerk-expo'
 import * as SecureStore from 'expo-secure-store'
 import { Platform, View } from 'react-native'
+import { AppNotificationHandler } from '../hooks/useAppNotifications'
 
 const tokenCache = {
   async getToken(key: string) {
@@ -50,6 +51,7 @@ export default function RootLayout() {
           {Platform.OS === 'web' && (
             <View nativeID="clerk-captcha" />
           )}
+          <AppNotificationHandler />
           <Stack screenOptions={{ headerShown: false }} />
         </SafeAreaProvider>
       </ClerkLoaded>

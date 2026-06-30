@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../utils/supabase';
+import { updateTaskAnalysis } from '../../utils/analytics';
 
 export default function MemberTasks() {
   const { memberId } = useGlobalSearchParams<{ memberId: string }>();
@@ -33,8 +34,10 @@ export default function MemberTasks() {
           specific_instructions,
           submission_notes,
           submission_image_url,
+          revisions_count,
           tasks!inner (
             id,
+            team_id,
             title,
             description,
             category,
@@ -143,6 +146,46 @@ export default function MemberTasks() {
         console.error("Assignment Update Error:", assignError);
         throw new Error("Failed to update assignment: " + assignError.message);
       }
+
+      // Calculate points
+      const createdDate = new Date(selectedAssignment.created_at).getTime();
+      const dueDate = new Date(selectedAssignment.tasks.due_date).getTime();
+      const completedDate = new Date(now).getTime();
+
+      let earnedPoints = 10;
+
+      if (selectedAssignment.status === 'revision' || selectedAssignment.revisions_count > 0) {
+        earnedPoints = 0;
+      } else if (completedDate > dueDate) {
+        earnedPoints = -1;
+      } else {
+        const totalDuration = dueDate - createdDate;
+        if (totalDuration > 0) {
+          const timeRemaining = dueDate - completedDate;
+          const percentageRemaining = (timeRemaining / totalDuration) * 100;
+          
+          if (percentageRemaining >= 75) {
+            earnedPoints = 10;
+          } else if (percentageRemaining >= 50) {
+            earnedPoints = 7;
+          } else if (percentageRemaining >= 25) {
+            earnedPoints = 4;
+          } else {
+            earnedPoints = 2;
+          }
+        }
+      }
+      
+      let analyticsUpdate: any = { points: earnedPoints };
+      
+      if (selectedAssignment.status === 'revision' || selectedAssignment.revisions_count > 0) {
+        analyticsUpdate.revision = true;
+      } else {
+        analyticsUpdate.completed = true;
+      }
+      
+      // Update analytics
+      await updateTaskAnalysis(selectedAssignment.tasks.team_id, memberId, analyticsUpdate);
 
       // 3. Check if all assignments for this task are completed
       const { data: allAssigns, error: allAssignsError } = await supabase

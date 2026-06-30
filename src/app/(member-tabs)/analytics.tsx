@@ -1,77 +1,80 @@
 import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { supabase } from '../../utils/supabase';
 
 import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useGlobalSearchParams, useFocusEffect } from 'expo-router';
+import { useUser } from '@clerk/clerk-expo';
 
 export default function MemberAnalytics() {
+  const { memberId: paramMemberId, teamId: paramTeamId } = useGlobalSearchParams<{ memberId: string, teamId: string }>();
+  const { user } = useUser();
   const [memberId, setMemberId] = useState<string>('');
   const [teamId, setTeamId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [points, setPoints] = useState(0);
   const [stats, setStats] = useState({ assigned: 0, completed: 0, revisions: 0 });
 
-  useEffect(() => {
-    const init = async () => {
-      let mId = memberId;
-      let tId = teamId;
-      if (!mId) {
-        mId = await AsyncStorage.getItem('memberId') || '';
+  useFocusEffect(
+    useCallback(() => {
+      const init = async () => {
+        let mId = paramMemberId;
+        let tId = paramTeamId;
+        
+        if ((!mId || !tId) && user) {
+          const memberDataStr = await AsyncStorage.getItem(`member_team_${user.id}`);
+          if (memberDataStr) {
+            const memberData = JSON.parse(memberDataStr);
+            mId = memberData.memberId;
+            tId = memberData.teamId;
+          }
+        }
+        
+        if (!mId) mId = await AsyncStorage.getItem('memberId') || '';
+        if (!tId) tId = await AsyncStorage.getItem('teamId') || '';
+
         setMemberId(mId);
-      }
-      if (!tId) {
-        tId = await AsyncStorage.getItem('teamId') || '';
         setTeamId(tId);
-      }
-      if (mId && tId) {
-        fetchAnalytics(mId, tId);
-      } else {
-        setLoading(false);
-      }
-    };
-    init();
-  }, []);
+
+        if (mId && tId) {
+          fetchAnalytics(mId, tId);
+        } else {
+          setLoading(false);
+        }
+      };
+
+      init();
+      const interval = setInterval(init, 5000);
+      return () => clearInterval(interval);
+    }, [paramMemberId, paramTeamId, user?.id])
+  );
 
   const fetchAnalytics = async (mId: string, tId: string) => {
     try {
       const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const month_year = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-      const { data: assignments } = await supabase
-        .from('task_assignments')
-        .select(`
-          id, status, completed_at, revisions_count, created_at,
-          tasks!inner(created_at, due_date, team_id, category)
-        `)
+      const { data: analyticsData, error } = await supabase
+        .from('task_analysis')
+        .select('*')
+        .eq('team_id', tId)
         .eq('member_id', mId)
-        .eq('tasks.team_id', tId)
-        .gte('created_at', startOfMonth);
+        .eq('month_year', month_year)
+        .single();
 
-      if (!assignments) return;
+      if (error && error.code !== 'PGRST116') { // PGRST116 is no rows returned, which is fine
+        throw error;
+      }
 
-      let assignedCount = assignments.length;
-      let completedCount = assignments.filter(a => a.status === 'completed').length;
-      let revisionsCount = assignments.reduce((acc, curr) => acc + (curr.revisions_count || 0), 0);
-
-      setStats({ assigned: assignedCount, completed: completedCount, revisions: revisionsCount });
-
-      let calculatedPoints = 0;
-
-      assignments.forEach((a: any) => {
-        let penalty = a.revisions_count || 0;
-        if (a.tasks?.category === 'Revision') penalty += 1;
-        calculatedPoints -= penalty;
-
-        if (a.status === 'completed' && a.completed_at) {
-          if (a.tasks?.category !== 'Revision') {
-             calculatedPoints += 10;
-          }
-        }
+      setStats({ 
+        assigned: analyticsData?.assigned_count || 0, 
+        completed: analyticsData?.completed_count || 0, 
+        revisions: analyticsData?.revisions_count || 0 
       });
 
-      setPoints(calculatedPoints);
+      setPoints(analyticsData?.points || 0);
     } catch (e) {
       console.log("Member Analytics Error:", e);
     } finally {
@@ -79,10 +82,11 @@ export default function MemberAnalytics() {
     }
   };
 
-  const maxGraphValue = Math.max(stats.assigned, stats.completed, stats.revisions, 1);
-  const assignedHeight = (stats.assigned / maxGraphValue) * 100;
-  const completedHeight = (stats.completed / maxGraphValue) * 100;
-  const revisionsHeight = (stats.revisions / maxGraphValue) * 100;
+  const maxGraphValue = Math.max(stats.assigned, stats.completed, stats.revisions, 1000);
+  const maxBarHeight = 120;
+  const assignedHeight = stats.assigned > 0 ? Math.max((stats.assigned / maxGraphValue) * maxBarHeight, 4) : 0;
+  const completedHeight = stats.completed > 0 ? Math.max((stats.completed / maxGraphValue) * maxBarHeight, 4) : 0;
+  const revisionsHeight = stats.revisions > 0 ? Math.max((stats.revisions / maxGraphValue) * maxBarHeight, 4) : 0;
 
   return (
     <SafeAreaView className="flex-1 bg-[#F9F9FB]">
@@ -107,21 +111,21 @@ export default function MemberAnalytics() {
 
             <View className="flex-row items-end justify-between h-48 border-b border-slate-100 pb-2 px-2">
               {/* Assigned Bar */}
-              <View className="items-center flex-1">
+              <View className="items-center flex-1 justify-end h-full">
                 <Text className="text-slate-500 font-bold mb-2 text-xs">{stats.assigned}</Text>
-                <View className="w-12 bg-indigo-200 rounded-t-xl" style={{ height: `${assignedHeight}%`, minHeight: 20 }} />
+                <View className="w-12 bg-indigo-200 rounded-t-xl" style={{ height: assignedHeight }} />
                 <Text className="text-slate-600 font-bold mt-3 text-xs">Assigned</Text>
               </View>
               {/* Completed Bar */}
-              <View className="items-center flex-1">
+              <View className="items-center flex-1 justify-end h-full">
                 <Text className="text-slate-500 font-bold mb-2 text-xs">{stats.completed}</Text>
-                <View className="w-12 bg-emerald-400 rounded-t-xl shadow-sm shadow-emerald-200" style={{ height: `${completedHeight}%`, minHeight: 20 }} />
+                <View className="w-12 bg-emerald-400 rounded-t-xl shadow-sm shadow-emerald-200" style={{ height: completedHeight }} />
                 <Text className="text-slate-600 font-bold mt-3 text-xs">Completed</Text>
               </View>
               {/* Revisions Bar */}
-              <View className="items-center flex-1">
+              <View className="items-center flex-1 justify-end h-full">
                 <Text className="text-slate-500 font-bold mb-2 text-xs">{stats.revisions}</Text>
-                <View className="w-12 bg-rose-400 rounded-t-xl shadow-sm shadow-rose-200" style={{ height: `${revisionsHeight}%`, minHeight: 20 }} />
+                <View className="w-12 bg-rose-400 rounded-t-xl shadow-sm shadow-rose-200" style={{ height: revisionsHeight }} />
                 <Text className="text-slate-600 font-bold mt-3 text-xs">Revisions</Text>
               </View>
             </View>
@@ -136,16 +140,20 @@ export default function MemberAnalytics() {
 
             <View className="gap-3">
               <View className="flex-row justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
-                <Text className="text-slate-700 text-sm font-medium">Submitted with {'>'}75% time left</Text>
+                <Text className="text-slate-700 text-sm font-medium">Submitted with 100-75% time left</Text>
                 <Text className="text-emerald-600 font-bold">+10 pts</Text>
               </View>
               <View className="flex-row justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
-                <Text className="text-slate-700 text-sm font-medium">Submitted with {'>'}50% time left</Text>
+                <Text className="text-slate-700 text-sm font-medium">Submitted with 74-50% time left</Text>
                 <Text className="text-emerald-600 font-bold">+7 pts</Text>
               </View>
               <View className="flex-row justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
-                <Text className="text-slate-700 text-sm font-medium">Submitted with {'>'}25% time left</Text>
-                <Text className="text-emerald-600 font-bold">+3 pts</Text>
+                <Text className="text-slate-700 text-sm font-medium">Submitted with 49-25% time left</Text>
+                <Text className="text-emerald-600 font-bold">+4 pts</Text>
+              </View>
+              <View className="flex-row justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <Text className="text-slate-700 text-sm font-medium">Submitted with 24-0% time left</Text>
+                <Text className="text-emerald-600 font-bold">+2 pts</Text>
               </View>
               <View className="flex-row justify-between items-center bg-red-50/50 p-3 rounded-xl border border-red-50">
                 <Text className="text-slate-700 text-sm font-medium">Submitted after deadline</Text>
