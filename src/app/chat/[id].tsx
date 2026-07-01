@@ -167,6 +167,48 @@ export default function ChatScreen() {
          throw insertRes.error;
       }
 
+      // Send Push Notification
+      try {
+        const { sendExpoPushNotification } = await import('../../utils/notifications');
+        
+        let actualRecipientUserId = null;
+        let actualMemberId = null;
+
+        if (receiverId === 'manager') {
+          // Fetch manager user_id
+          const { data: teamData } = await supabase
+            .from('teams')
+            .select('organization_id')
+            .eq('id', teamId)
+            .single();
+            
+          if (teamData?.organization_id) {
+            const { data: orgData } = await supabase
+              .from('organizations')
+              .select('created_by')
+              .eq('id', teamData.organization_id)
+              .single();
+            if (orgData?.created_by) {
+              actualRecipientUserId = orgData.created_by;
+            }
+          }
+        } else if (receiverId) {
+          actualMemberId = receiverId;
+        }
+
+        if (actualRecipientUserId || actualMemberId) {
+          await sendExpoPushNotification({
+            recipientUserId: actualRecipientUserId,
+            memberId: actualMemberId,
+            title: `New Message from ${senderName || 'User'}`,
+            body: contentText || 'Sent an image.',
+            data: { type: 'chat', teamId }
+          });
+        }
+      } catch (pushErr) {
+        console.error("Push Notification error:", pushErr);
+      }
+
       fetchMessages();
     } catch (e: any) {
       alert(e.message || "Failed to send message.");

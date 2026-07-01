@@ -6,13 +6,10 @@ const supabase = createClient(
 );
 
 async function checkSchema() {
-  const { data, error } = await supabase.from('messages').select('*').limit(1);
-  if (error) {
-    console.log("Error:", error.message);
-  } else if (data && data.length > 0) {
-    console.log("Columns:", Object.keys(data[0]));
-  } else {
-    console.log("No messages, but query succeeded");
-  }
+  const { data: usersData, error } = await supabase.from('users').select('*').limit(1);
+  console.log("users error:", error?.message);
+  
+  const { data: profilesData, error: profError } = await supabase.from('profiles').select('*').limit(1);
+  console.log("profiles error:", profError?.message);
 }
 checkSchema();

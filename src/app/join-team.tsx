@@ -61,6 +61,7 @@ export default function JoinTeamScreen() {
         .single();
 
       if (teamError || !teamData) {
+        console.error('TEAM JOIN ERROR:', teamError);
         throw new Error("Invalid team code. Please check and try again.");
       }
 
@@ -102,6 +103,7 @@ export default function JoinTeamScreen() {
         .from('team_members')
         .insert([{
           team_id: teamInfo.id,
+          user_id: user?.id,
           member_name: memberName,
           role_id: selectedRoleId,
           status: 'pending',
@@ -119,6 +121,24 @@ export default function JoinTeamScreen() {
         await AsyncStorage.setItem(`member_team_${user.id}`, JSON.stringify({
           memberId: insertedMember.id
         }));
+      }
+
+      if (teamInfo.organization_id) {
+        const { data: orgData } = await supabase
+          .from('organizations')
+          .select('created_by')
+          .eq('id', teamInfo.organization_id)
+          .single();
+          
+        if (orgData && orgData.created_by) {
+          const { sendExpoPushNotification } = await import('../utils/notifications');
+          await sendExpoPushNotification({
+            recipientUserId: orgData.created_by,
+            title: 'New Team Member Request',
+            body: `${memberName} has requested to join your team.`,
+            data: { type: 'join_request' }
+          });
+        }
       }
 
       // Route to pending approval screen

@@ -4,7 +4,10 @@ const supabase = createClient('https://sjvakvjvlihwmcrpnyfp.supabase.co', 'sb_pu
 async function run() {
   const { error } = await supabase.rpc('execute_sql', { 
     sql: `
-      ALTER TABLE teams ADD COLUMN IF NOT EXISTS manager_user_id UUID REFERENCES auth.users(id);
+      ALTER TABLE team_members DROP CONSTRAINT IF EXISTS team_members_user_id_fkey;
+      ALTER TABLE team_members ALTER COLUMN user_id TYPE TEXT;
+      ALTER TABLE organizations DROP CONSTRAINT IF EXISTS organizations_created_by_fkey;
+      ALTER TABLE organizations ALTER COLUMN created_by TYPE TEXT;
       NOTIFY pgrst, 'reload schema';
     ` 
   });

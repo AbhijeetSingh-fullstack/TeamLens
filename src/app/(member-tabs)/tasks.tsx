@@ -211,6 +211,31 @@ export default function MemberTasks() {
         }
       }
 
+      // Fetch manager's user_id to send push notification
+      const { data: teamData } = await supabase
+        .from('teams')
+        .select('organization_id')
+        .eq('id', selectedAssignment.tasks.team_id)
+        .single();
+        
+      if (teamData && teamData.organization_id) {
+        const { data: orgData } = await supabase
+          .from('organizations')
+          .select('created_by')
+          .eq('id', teamData.organization_id)
+          .single();
+          
+        if (orgData && orgData.created_by) {
+          const { sendExpoPushNotification } = await import('../../utils/notifications');
+          await sendExpoPushNotification({
+            recipientUserId: orgData.created_by,
+            title: 'Task Submitted',
+            body: `A member has submitted a task: ${selectedAssignment.tasks.title}`,
+            data: { type: 'task_submitted' }
+          });
+        }
+      }
+
       setSubmitModalVisible(false);
       fetchTasks();
       Alert.alert("Success", "Task submitted successfully! Great job.");
