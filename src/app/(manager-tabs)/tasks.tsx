@@ -159,9 +159,17 @@ export default function ManagerTasks() {
 
       if (assignError) throw assignError;
 
-      // 3. Update analytics for each assigned member
+      // 3. Update analytics and send notifications for each assigned member
+      const { sendExpoPushNotification } = await import('../../utils/notifications');
       for (const memberId of selectedMembers) {
         await updateTaskAnalysis(teamData.id, memberId, { assigned: true });
+        
+        await sendExpoPushNotification({
+          memberId: memberId,
+          title: 'New Task Assigned',
+          body: `You have been assigned a new task: ${newTask.title}`,
+          data: { type: 'task' }
+        });
       }
 
       // Reset and close
@@ -195,6 +203,14 @@ export default function ManagerTasks() {
 
       // Update analytics (-1 pt per revision, count incremented upon completion)
       await updateTaskAnalysis(teamId, memberId, { points: -1 });
+
+      const { sendExpoPushNotification } = await import('../../utils/notifications');
+      await sendExpoPushNotification({
+        memberId: memberId,
+        title: 'Revision Requested',
+        body: 'A task has been returned to you for revision.',
+        data: { type: 'task_revision' }
+      });
 
       setDetailModalVisible(false);
       fetchTasksAndMembers();

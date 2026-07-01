@@ -24,13 +24,14 @@ export default function WelcomeScreen() {
       }
 
       try {
-        // 1. Check if they are an active team member using AsyncStorage
         const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+        
+        // 1. Check if they are an active team member using AsyncStorage or DB fallback
         const memberDataStr = await AsyncStorage.getItem(`member_team_${user.id}`);
+        let memberMatched = false;
         
         if (memberDataStr) {
           const { memberId } = JSON.parse(memberDataStr);
-          
           const { data: memberData } = await supabase
             .from('team_members')
             .select('team_id, member_name, id, status, teams(team_code, team_name)')
@@ -38,20 +39,70 @@ export default function WelcomeScreen() {
             .single();
 
           if (memberData && memberData.teams && memberData.status !== 'rejected') {
-            router.replace({
-              pathname: '/(member-tabs)/dashboard',
-              params: {
-                teamName: memberData.teams.team_name,
-                memberName: memberData.member_name,
-                memberId: memberData.id,
-                teamId: memberData.team_id
-              }
-            });
+            memberMatched = true;
+            if (memberData.status === 'pending') {
+              router.replace({
+                pathname: '/pending-approval',
+                params: {
+                  teamName: memberData.teams.team_name,
+                  memberName: memberData.member_name,
+                  roleName: 'Member'
+                }
+              });
+            } else {
+              router.replace({
+                pathname: '/(member-tabs)/dashboard',
+                params: {
+                  teamName: memberData.teams.team_name,
+                  memberName: memberData.member_name,
+                  memberId: memberData.id,
+                  teamId: memberData.team_id
+                }
+              });
+            }
+            return;
+          }
+        }
+        
+        // DB Fallback for Team Member
+        if (!memberMatched) {
+          const { data: memberDataDb, error: memberError } = await supabase
+            .from('team_members')
+            .select('team_id, member_name, id, status, teams(team_code, team_name)')
+            .eq('user_id', user.id)
+            .neq('status', 'rejected')
+            .order('joined_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+            
+          if (memberDataDb && memberDataDb.teams) {
+            await AsyncStorage.setItem(`member_team_${user.id}`, JSON.stringify({ memberId: memberDataDb.id }));
+            
+            if (memberDataDb.status === 'pending') {
+              router.replace({
+                pathname: '/pending-approval',
+                params: {
+                  teamName: memberDataDb.teams.team_name,
+                  memberName: memberDataDb.member_name,
+                  roleName: 'Member'
+                }
+              });
+            } else {
+              router.replace({
+                pathname: '/(member-tabs)/dashboard',
+                params: {
+                  teamName: memberDataDb.teams.team_name,
+                  memberName: memberDataDb.member_name,
+                  memberId: memberDataDb.id,
+                  teamId: memberDataDb.team_id
+                }
+              });
+            }
             return;
           }
         }
 
-        // 2. Check if they are a manager using AsyncStorage (since name matching is insecure)
+        // 2. Check if they are a manager using AsyncStorage or DB fallback
         const managerDataStr = await AsyncStorage.getItem(`manager_team_${user.id}`);
         
         if (managerDataStr) {
@@ -64,6 +115,31 @@ export default function WelcomeScreen() {
             }
           });
           return;
+        } else {
+           // DB Fallback for Manager
+           const { data: orgData } = await supabase
+             .from('organizations')
+             .select('id, teams(team_code, team_name)')
+             .eq('created_by', user.id)
+             .order('created_at', { ascending: false })
+             .limit(1)
+             .maybeSingle();
+             
+           if (orgData && orgData.teams && orgData.teams.length > 0) {
+             const team = Array.isArray(orgData.teams) ? orgData.teams[0] : orgData.teams;
+             await AsyncStorage.setItem(`manager_team_${user.id}`, JSON.stringify({
+               teamCode: team.team_code,
+               teamName: team.team_name,
+             }));
+             router.replace({
+               pathname: '/(manager-tabs)/dashboard',
+               params: {
+                 teamCode: team.team_code,
+                 teamName: team.team_name
+               }
+             });
+             return;
+           }
         }
 
       } catch (err) {

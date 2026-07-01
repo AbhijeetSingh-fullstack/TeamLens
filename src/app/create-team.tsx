@@ -57,7 +57,10 @@ export default function CreateTeamScreen() {
       // 1. Insert Organization
       const { data: orgData, error: orgError } = await supabase
         .from('organizations')
-        .insert([{ organization_name: orgName }])
+        .insert([{ 
+          organization_name: orgName,
+          created_by: user.id
+        }])
         .select()
         .single();
 

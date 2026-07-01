@@ -42,7 +42,7 @@ export default function MemberDashboard() {
         .eq('id', memberId)
         .single();
 
-      if (!memberStatus || memberStatus.status !== 'approved') {
+      if (!memberStatus || memberStatus.status === 'pending' || memberStatus.status === 'rejected') {
         // Kick them out!
         router.replace('/');
         return;

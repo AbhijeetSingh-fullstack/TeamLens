@@ -10,7 +10,7 @@ export function useAppNotifications() {
   const responseListener = useRef<any>();
 
   useEffect(() => {
-    registerForPushNotificationsAsync();
+    registerForPushNotificationsAsync(user?.id);
 
     if (!user?.id) return;
 
