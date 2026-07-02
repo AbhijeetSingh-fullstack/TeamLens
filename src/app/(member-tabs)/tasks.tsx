@@ -50,14 +50,7 @@ export default function MemberTasks() {
         .order('created_at', { ascending: false });
 
       if (data) {
-        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).getTime();
-        const filtered = data.filter(a => {
-          if (a.status === 'completed' && a.completed_at) {
-            return new Date(a.completed_at).getTime() > oneDayAgo;
-          }
-          return true;
-        });
-        setAssignments(filtered);
+        setAssignments(data);
       }
     } catch (e) {
       console.log('Error fetching assigned tasks:', e);

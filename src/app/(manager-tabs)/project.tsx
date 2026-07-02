@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useGlobalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../utils/supabase';
 import { updateTaskAnalysis } from '../../utils/analytics';
@@ -15,13 +15,40 @@ export default function ManagerProjects() {
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [isModalVisible, setModalVisible] = useState(false);
 
-  const handleRequestRevision = async (assignmentId: string, revisionsCount: number, taskId: string, memberId: string, teamId: string) => {
+  const [isRevisionModalVisible, setRevisionModalVisible] = useState(false);
+  const [revisionNotes, setRevisionNotes] = useState('');
+  const [revisionData, setRevisionData] = useState<any>(null);
+
+  const openRevisionModal = (assign: any) => {
+    setRevisionData({
+      assignmentId: assign.id,
+      currentRevisions: assign.revisions_count || 0,
+      taskId: selectedTask.id,
+      memberId: assign.member_id,
+      teamId: selectedTask.team_id,
+      currentInstructions: assign.specific_instructions || ''
+    });
+    setRevisionNotes('');
+    setRevisionModalVisible(true);
+  };
+
+  const handleRequestRevision = async () => {
+    if (!revisionData || !revisionNotes.trim()) {
+      alert("Please enter revision notes.");
+      return;
+    }
+
     try {
+      const { assignmentId, currentRevisions, taskId, memberId, teamId, currentInstructions } = revisionData;
+      
+      const newInstructions = currentInstructions + '\n\n--- Revision Notes ---\n' + revisionNotes;
+
       const { error } = await supabase
         .from('task_assignments')
         .update({
           status: 'revision',
-          revisions_count: revisionsCount + 1,
+          revisions_count: currentRevisions + 1,
+          specific_instructions: newInstructions,
           completed_at: null,
           submission_notes: null,
           submission_image_url: null
@@ -36,6 +63,7 @@ export default function ManagerProjects() {
       // Update analytics (-1 points per revision, but count is incremented upon completion)
       await updateTaskAnalysis(teamId, memberId, { points: -1 });
 
+      setRevisionModalVisible(false);
       setModalVisible(false);
       fetchArchivedTasks();
       alert("Revision requested! Task sent back to employee.");
@@ -74,13 +102,7 @@ export default function ManagerProjects() {
         .order('completed_at', { ascending: false });
 
       if (tasksData) {
-        // Filter out tasks completed less than 24 hours ago
-        const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
-        const filtered = tasksData.filter(t => {
-          if (!t.completed_at) return false;
-          return new Date(t.completed_at).getTime() <= twentyFourHoursAgo;
-        });
-        setArchivedTasks(filtered);
+        setArchivedTasks(tasksData);
       }
     } catch (e) {
       console.log('Error fetching archived tasks:', e);
@@ -150,7 +172,7 @@ export default function ManagerProjects() {
               <View className="w-16 h-16 bg-slate-100 rounded-full items-center justify-center mb-4">
                 <Feather name="archive" size={24} color="#94a3b8" />
               </View>
-              <Text className="text-slate-500 font-medium text-center">No projects archived yet.{'\n'}Tasks move here 24 hour after completion.</Text>
+              <Text className="text-slate-500 font-medium text-center">No projects archived yet.{'\n'}Tasks move here when completed.</Text>
             </View>
           }
         />
@@ -211,7 +233,7 @@ export default function ManagerProjects() {
                   )}
 
                   <TouchableOpacity
-                    onPress={() => handleRequestRevision(assign.id, assign.revisions_count || 0, selectedTask.id, assign.member_id, selectedTask.team_id)}
+                    onPress={() => openRevisionModal(assign)}
                     className="mt-2 bg-red-50 border border-red-100 py-3 rounded-xl items-center flex-row justify-center gap-2"
                   >
                     <Feather name="refresh-ccw" size={16} color="#ef4444" />
@@ -222,6 +244,38 @@ export default function ManagerProjects() {
               <View className="h-10" />
             </ScrollView>
           )}
+        </View>
+      </Modal>
+
+      {/* Revision Modal */}
+      <Modal visible={isRevisionModalVisible} transparent animationType="fade">
+        <View className="flex-1 bg-black/50 justify-center px-4">
+          <View className="bg-white rounded-3xl p-5 shadow-xl">
+            <View className="flex-row items-center justify-between mb-4">
+              <Text className="text-lg font-bold text-slate-800">Request Revision</Text>
+              <TouchableOpacity onPress={() => setRevisionModalVisible(false)} className="w-8 h-8 items-center justify-center bg-slate-100 rounded-full">
+                <Feather name="x" size={16} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+            <Text className="text-slate-500 mb-4 text-sm">Please provide specific instructions on what needs to be changed or improved.</Text>
+            
+            <TextInput
+              placeholder="What needs to be revised?"
+              multiline
+              numberOfLines={4}
+              className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 mb-6 text-slate-800 text-sm"
+              style={{ textAlignVertical: 'top', minHeight: 100 }}
+              value={revisionNotes}
+              onChangeText={setRevisionNotes}
+            />
+
+            <TouchableOpacity
+              onPress={handleRequestRevision}
+              className="bg-red-500 py-4 rounded-xl items-center shadow-sm"
+            >
+              <Text className="text-white font-bold text-base">Send Revision Request</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </SafeAreaView>

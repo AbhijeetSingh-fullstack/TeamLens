@@ -36,6 +36,10 @@ export default function ManagerTasks() {
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [isDetailModalVisible, setDetailModalVisible] = useState(false);
 
+  const [isRevisionModalVisible, setRevisionModalVisible] = useState(false);
+  const [revisionNotes, setRevisionNotes] = useState('');
+  const [revisionData, setRevisionData] = useState<any>(null);
+
   const fetchTasksAndMembers = async () => {
     if (!teamCode) return;
     try {
@@ -75,13 +79,7 @@ export default function ManagerTasks() {
         .order('created_at', { ascending: false });
 
       if (tasksData) {
-        const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
-        const filtered = tasksData.filter(t => {
-          if (t.status !== 'completed') return true;
-          if (!t.completed_at) return true;
-          return new Date(t.completed_at).getTime() > twentyFourHoursAgo;
-        });
-        setTasks(filtered);
+        setTasks(tasksData);
       }
     } catch (e) {
       console.log('Error fetching tasks:', e);
@@ -185,14 +183,37 @@ export default function ManagerTasks() {
     }
   };
 
-  const handleRequestRevision = async (assignmentId: string, currentRevisions: number, taskId: string, memberId: string, teamId: string) => {
+  const openRevisionModal = (assign: any) => {
+    setRevisionData({
+      assignmentId: assign.id,
+      currentRevisions: assign.revisions_count || 0,
+      taskId: selectedTask.id,
+      memberId: assign.member_id,
+      teamId: selectedTask.team_id,
+      currentInstructions: assign.specific_instructions || ''
+    });
+    setRevisionNotes('');
+    setRevisionModalVisible(true);
+  };
+
+  const handleRequestRevision = async () => {
+    if (!revisionData || !revisionNotes.trim()) {
+      Alert.alert("Missing Info", "Please enter revision notes.");
+      return;
+    }
+    
     try {
+      const { assignmentId, currentRevisions, taskId, memberId, teamId, currentInstructions } = revisionData;
+      
+      const newInstructions = currentInstructions + '\n\n--- Revision Notes ---\n' + revisionNotes;
+
       // Increment revisions_count and set status to revision
       const { error } = await supabase
         .from('task_assignments')
         .update({
           status: 'revision',
-          revisions_count: currentRevisions + 1
+          revisions_count: currentRevisions + 1,
+          specific_instructions: newInstructions
         })
         .eq('id', assignmentId);
 
@@ -212,6 +233,7 @@ export default function ManagerTasks() {
         data: { type: 'task_revision' }
       });
 
+      setRevisionModalVisible(false);
       setDetailModalVisible(false);
       fetchTasksAndMembers();
       Alert.alert("Revision Requested", "Task has been sent back to the employee.");
@@ -227,16 +249,7 @@ export default function ManagerTasks() {
 
   const filteredTasks = tasks.filter(t => {
     if (!t.title?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-
-    // Hide if completed > 1 hour ago
-    if (t.status === 'completed' && t.completed_at) {
-      const completedTime = new Date(t.completed_at).getTime();
-      const oneHourAgo = Date.now() - 60 * 60 * 1000;
-      if (completedTime < oneHourAgo) {
-        return false;
-      }
-    }
-    return true;
+    return t.status !== 'completed';
   });
 
   const renderTask = ({ item }: { item: any }) => {
@@ -575,7 +588,7 @@ export default function ManagerTasks() {
                       )}
 
                       <TouchableOpacity
-                        onPress={() => handleRequestRevision(assign.id, assign.revisions_count || 0, selectedTask.id, assign.member_id, selectedTask.team_id)}
+                        onPress={() => openRevisionModal(assign)}
                         className="mt-2 bg-red-50 border border-red-100 py-3 rounded-xl items-center flex-row justify-center gap-2"
                       >
                         <Feather name="refresh-ccw" size={16} color="#ef4444" />
@@ -596,6 +609,38 @@ export default function ManagerTasks() {
             </ScrollView>
           )}
         </View>
+      </Modal>
+
+      {/* Revision Modal */}
+      <Modal visible={isRevisionModalVisible} transparent animationType="fade">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 bg-black/50 justify-center px-4">
+          <View className="bg-white rounded-3xl p-5 shadow-xl">
+            <View className="flex-row items-center justify-between mb-4">
+              <Text className="text-lg font-bold text-slate-800">Request Revision</Text>
+              <TouchableOpacity onPress={() => setRevisionModalVisible(false)} className="w-8 h-8 items-center justify-center bg-slate-100 rounded-full">
+                <Feather name="x" size={16} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+            <Text className="text-slate-500 mb-4 text-sm">Please provide specific instructions on what needs to be changed or improved.</Text>
+            
+            <TextInput
+              placeholder="What needs to be revised?"
+              multiline
+              numberOfLines={4}
+              className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 mb-6 text-slate-800 text-sm"
+              style={{ textAlignVertical: 'top', minHeight: 100 }}
+              value={revisionNotes}
+              onChangeText={setRevisionNotes}
+            />
+
+            <TouchableOpacity
+              onPress={handleRequestRevision}
+              className="bg-red-500 py-4 rounded-xl items-center shadow-sm"
+            >
+              <Text className="text-white font-bold text-base">Send Revision Request</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
