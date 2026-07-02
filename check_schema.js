@@ -6,10 +6,12 @@ const supabase = createClient(
 );
 
 async function checkSchema() {
-  const { data: usersData, error } = await supabase.from('users').select('*').limit(1);
-  console.log("users error:", error?.message);
+  const { data: teamsData, error: teamsError } = await supabase.from('teams').select('*').limit(1);
+  console.log("teams error:", teamsError?.message);
+  console.log("teams data:", teamsData);
   
-  const { data: profilesData, error: profError } = await supabase.from('profiles').select('*').limit(1);
-  console.log("profiles error:", profError?.message);
+  const { data: orgsData, error: orgsError } = await supabase.from('organizations').select('*').limit(1);
+  console.log("orgs error:", orgsError?.message);
+  console.log("orgs data:", orgsData);
 }
 checkSchema();

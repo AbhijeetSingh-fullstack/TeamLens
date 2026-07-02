@@ -21,6 +21,8 @@ export default function WorkspaceSettingsScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [teamId, setTeamId] = useState<string | null>(null);
   const [teamName, setTeamName] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [roles, setRoles] = useState<RoleInfo[]>([]);
   const [newRole, setNewRole] = useState('');
 
@@ -99,6 +101,26 @@ export default function WorkspaceSettingsScreen() {
       Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to update workspace name.' });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleUpdatePassword = async () => {
+    if (!teamId || !newPassword.trim()) return;
+    
+    setIsUpdatingPassword(true);
+    try {
+      const { error } = await supabase
+        .from('teams')
+        .update({ workspace_password: newPassword.trim() })
+        .eq('id', teamId);
+        
+      if (error) throw error;
+      Toast.show({ type: 'success', text1: 'Success', text2: 'Workspace password updated!' });
+      setNewPassword('');
+    } catch (error: any) {
+      Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to update password.' });
+    } finally {
+      setIsUpdatingPassword(false);
     }
   };
 
@@ -197,6 +219,33 @@ export default function WorkspaceSettingsScreen() {
                   <ActivityIndicator color="white" size="small" />
                 ) : (
                   <Text className="text-white font-bold text-sm">Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Workspace Password Section */}
+          <View className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm mb-6">
+            <Text className="text-slate-600 text-xs font-bold uppercase tracking-wider mb-2 ml-1">Change Password</Text>
+            <Text className="text-slate-500 text-xs mb-3 ml-1">Set a new password for managers to log into this workspace.</Text>
+            <View className="flex-row items-center gap-3">
+              <TextInput
+                value={newPassword}
+                onChangeText={setNewPassword}
+                placeholder="New workspace password"
+                secureTextEntry
+                className="flex-1 bg-[#F4F5FA] border border-slate-200/60 rounded-xl px-4 py-3 text-slate-800 font-medium"
+                placeholderTextColor="#94a3b8"
+              />
+              <TouchableOpacity 
+                onPress={handleUpdatePassword}
+                disabled={isUpdatingPassword || !newPassword.trim()}
+                className={`px-5 py-3.5 rounded-xl shadow-sm ${newPassword.trim() ? 'bg-indigo-600' : 'bg-slate-300'}`}
+              >
+                {isUpdatingPassword ? (
+                  <ActivityIndicator color="white" size="small" />
+                ) : (
+                  <Text className="text-white font-bold text-sm">Update</Text>
                 )}
               </TouchableOpacity>
             </View>
