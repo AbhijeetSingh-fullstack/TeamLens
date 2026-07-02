@@ -20,6 +20,7 @@ import {
 } from 'date-fns';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Toast from 'react-native-toast-message';
 
 export default function Schedule() {
   const [memberId, setMemberId] = useState<string>('');
@@ -87,12 +88,12 @@ export default function Schedule() {
 
   const handleAddSchedule = async () => {
     if (!memberId) {
-      Alert.alert('Authentication Error', 'Could not verify your identity. Please sign out and log back in.');
+      Toast.show({ type: 'error', text1: 'Authentication Error', text2: 'Could not verify your identity. Please sign out and log back in.' });
       return;
     }
 
     if (!title.trim()) {
-      Alert.alert('Error', 'Please enter a title for the schedule.');
+      Toast.show({ type: 'error', text1: 'Error', text2: 'Please enter a title for the schedule.' });
       return;
     }
 
@@ -119,9 +120,9 @@ export default function Schedule() {
     } catch (err: any) {
       console.error('Supabase Insert Error:', err);
       if (Platform.OS === 'web') {
-        window.alert('Error: ' + (err.message || 'Failed to add schedule'));
+        Toast.show({ type: 'error', text1: 'Error', text2: err.message || 'Failed to add schedule' });
       } else {
-        Alert.alert('Error', err.message || 'Failed to add schedule');
+        Toast.show({ type: 'error', text1: 'Error', text2: err.message || 'Failed to add schedule' });
       }
     } finally {
       setSaving(false);

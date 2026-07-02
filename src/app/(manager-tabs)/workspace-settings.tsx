@@ -4,6 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useGlobalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { supabase } from '../../utils/supabase';
+import Toast from 'react-native-toast-message';
+import ConfirmModal from '../../components/ConfirmModal';
 
 type RoleInfo = {
   id: string;
@@ -21,6 +23,10 @@ export default function WorkspaceSettingsScreen() {
   const [teamName, setTeamName] = useState('');
   const [roles, setRoles] = useState<RoleInfo[]>([]);
   const [newRole, setNewRole] = useState('');
+
+  // Delete Role Modal State
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [roleToDelete, setRoleToDelete] = useState<{ id: string, name: string } | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -71,7 +77,7 @@ export default function WorkspaceSettingsScreen() {
       
       setRoles(rolesData || []);
     } catch (error: any) {
-      Alert.alert("Error", error.message);
+      Toast.show({ type: 'error', text1: 'Error', text2: error.message });
     } finally {
       setIsLoading(false);
     }
@@ -88,9 +94,9 @@ export default function WorkspaceSettingsScreen() {
         .eq('id', teamId);
         
       if (error) throw error;
-      Alert.alert("Success", "Workspace name updated!");
+      Toast.show({ type: 'success', text1: 'Success', text2: 'Workspace name updated!' });
     } catch (error: any) {
-      Alert.alert("Error", "Failed to update workspace name.");
+      Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to update workspace name.' });
     } finally {
       setIsSaving(false);
     }
@@ -111,35 +117,32 @@ export default function WorkspaceSettingsScreen() {
       setRoles([...roles, data]);
       setNewRole('');
     } catch (error: any) {
-      Alert.alert("Error", "Failed to add role.");
+      Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to add role.' });
     }
   };
 
-  const handleDeleteRole = async (roleId: string, roleName: string) => {
-    Alert.alert(
-      "Delete Role",
-      `Are you sure you want to delete the role "${roleName}"?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Delete", 
-          style: "destructive",
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('roles')
-                .delete()
-                .eq('id', roleId);
-                
-              if (error) throw error;
-              setRoles(roles.filter(r => r.id !== roleId));
-            } catch (error: any) {
-              Alert.alert("Error", "Failed to delete role. It may be assigned to members.");
-            }
-          }
-        }
-      ]
-    );
+  const handleDeleteRole = (roleId: string, roleName: string) => {
+    setRoleToDelete({ id: roleId, name: roleName });
+    setDeleteModalVisible(true);
+  };
+
+  const confirmDeleteRole = async () => {
+    if (!roleToDelete) return;
+    try {
+      const { error } = await supabase
+        .from('roles')
+        .delete()
+        .eq('id', roleToDelete.id);
+        
+      if (error) throw error;
+      setRoles(roles.filter(r => r.id !== roleToDelete.id));
+      Toast.show({ type: 'success', text1: 'Deleted', text2: 'Role deleted successfully.' });
+    } catch (error: any) {
+      Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to delete role. It may be assigned to members.' });
+    } finally {
+      setDeleteModalVisible(false);
+      setRoleToDelete(null);
+    }
   };
 
   if (isLoading) {
@@ -252,6 +255,18 @@ export default function WorkspaceSettingsScreen() {
 
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <ConfirmModal
+        visible={deleteModalVisible}
+        title="Delete Role"
+        message={`Are you sure you want to delete the role "${roleToDelete?.name}"?`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        isDestructive={true}
+        onConfirm={confirmDeleteRole}
+        onCancel={() => setDeleteModalVisible(false)}
+      />
+
     </SafeAreaView>
   );
 }

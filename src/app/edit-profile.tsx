@@ -7,6 +7,7 @@ import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../utils/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Toast from 'react-native-toast-message';
 
 export default function EditProfileScreen() {
   const router = useRouter();
@@ -43,7 +44,7 @@ export default function EditProfileScreen() {
         setBase64Image(`data:${mimeType};base64,${result.assets[0].base64}`);
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to pick image.');
+      Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to pick image.' });
     }
   };
 
@@ -118,7 +119,7 @@ export default function EditProfileScreen() {
 
     } catch (error: any) {
       console.error("Profile save error:", error);
-      Alert.alert('Error', error.errors?.[0]?.longMessage || error.message || 'Failed to update profile.');
+      Toast.show({ type: 'error', text1: 'Error', text2: error.errors?.[0]?.longMessage || error.message || 'Failed to update profile.' });
     } finally {
       setIsSaving(false);
     }

@@ -1,10 +1,11 @@
 import { Feather } from '@expo/vector-icons';
 import { useGlobalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../utils/supabase';
 import { updateTaskAnalysis } from '../../utils/analytics';
+import Toast from 'react-native-toast-message';
 
 export default function ManagerProjects() {
   const { teamCode } = useGlobalSearchParams<{ teamCode: string }>();
@@ -34,7 +35,7 @@ export default function ManagerProjects() {
 
   const handleRequestRevision = async () => {
     if (!revisionData || !revisionNotes.trim()) {
-      alert("Please enter revision notes.");
+      Toast.show({ type: 'error', text1: 'Missing Info', text2: 'Please enter revision notes.' });
       return;
     }
 
@@ -66,9 +67,9 @@ export default function ManagerProjects() {
       setRevisionModalVisible(false);
       setModalVisible(false);
       fetchArchivedTasks();
-      alert("Revision requested! Task sent back to employee.");
+      Toast.show({ type: 'success', text1: 'Revision requested', text2: 'Task sent back to employee.' });
     } catch (e: any) {
-      alert("Failed to request revision: " + e.message);
+      Toast.show({ type: 'error', text1: 'Failed', text2: "Failed to request revision: " + e.message });
     }
   };
 
@@ -102,7 +103,13 @@ export default function ManagerProjects() {
         .order('completed_at', { ascending: false });
 
       if (tasksData) {
-        setArchivedTasks(tasksData);
+        // Filter out tasks completed less than 24 hours ago
+        const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
+        const filtered = tasksData.filter(t => {
+          if (!t.completed_at) return false;
+          return new Date(t.completed_at).getTime() <= twentyFourHoursAgo;
+        });
+        setArchivedTasks(filtered);
       }
     } catch (e) {
       console.log('Error fetching archived tasks:', e);
@@ -249,7 +256,7 @@ export default function ManagerProjects() {
 
       {/* Revision Modal */}
       <Modal visible={isRevisionModalVisible} transparent animationType="fade">
-        <View className="flex-1 bg-black/50 justify-center px-4">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 bg-black/50 justify-center px-4">
           <View className="bg-white rounded-3xl p-5 shadow-xl">
             <View className="flex-row items-center justify-between mb-4">
               <Text className="text-lg font-bold text-slate-800">Request Revision</Text>
@@ -261,6 +268,7 @@ export default function ManagerProjects() {
             
             <TextInput
               placeholder="What needs to be revised?"
+              placeholderTextColor="#94a3b8"
               multiline
               numberOfLines={4}
               className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 mb-6 text-slate-800 text-sm"
@@ -276,7 +284,7 @@ export default function ManagerProjects() {
               <Text className="text-white font-bold text-base">Send Revision Request</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );

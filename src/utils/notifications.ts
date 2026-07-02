@@ -18,7 +18,7 @@ try {
 export async function registerForPushNotificationsAsync(userId?: string) {
   let token;
 
-  if (!Notifications) {
+  if (!Notifications || Platform.OS === 'web') {
     return;
   }
 
@@ -120,7 +120,7 @@ export async function sendExpoPushNotification(params: { recipientUserId?: strin
       .single();
 
     if (error || !tokenData || !tokenData.push_token) {
-      console.log(`No push token found for user ${userId}`);
+      // It is normal for users on simulators/emulators to not have a push token
       return;
     }
 

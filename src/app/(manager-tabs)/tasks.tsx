@@ -6,8 +6,9 @@ import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Modal, Platfo
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../utils/supabase';
 import { updateTaskAnalysis } from '../../utils/analytics';
+import Toast from 'react-native-toast-message';
 
-const CATEGORIES = ['Update', 'New Project', 'Feature', 'Bug', 'Review', 'Revision'];
+const CATEGORIES = ['Update', 'New Project', 'Feature', 'Bug', 'Review'];
 
 export default function ManagerTasks() {
   const { teamCode } = useGlobalSearchParams<{ teamCode: string }>();
@@ -110,7 +111,7 @@ export default function ManagerTasks() {
 
   const handleCreateTask = async () => {
     if (!newTask.title || selectedMembers.length === 0) {
-      Alert.alert("Missing Info", "Please provide a task title and select at least one team member.");
+      Toast.show({ type: 'error', text1: 'Missing Info', text2: 'Please provide a task title and select at least one team member.' });
       return;
     }
     setIsSubmitting(true);
@@ -176,8 +177,9 @@ export default function ManagerTasks() {
       setSelectedMembers([]);
       setInstructionsMap({});
       fetchTasksAndMembers();
+      Toast.show({ type: 'success', text1: 'Success', text2: 'Task assigned successfully!' });
     } catch (e: any) {
-      Alert.alert("Error", e.message);
+      Toast.show({ type: 'error', text1: 'Error', text2: e.message });
     } finally {
       setIsSubmitting(false);
     }
@@ -198,7 +200,7 @@ export default function ManagerTasks() {
 
   const handleRequestRevision = async () => {
     if (!revisionData || !revisionNotes.trim()) {
-      Alert.alert("Missing Info", "Please enter revision notes.");
+      Toast.show({ type: 'error', text1: 'Missing Info', text2: 'Please enter revision notes.' });
       return;
     }
     
@@ -236,9 +238,9 @@ export default function ManagerTasks() {
       setRevisionModalVisible(false);
       setDetailModalVisible(false);
       fetchTasksAndMembers();
-      Alert.alert("Revision Requested", "Task has been sent back to the employee.");
+      Toast.show({ type: 'success', text1: 'Revision Requested', text2: 'Task has been sent back to the employee.' });
     } catch (e: any) {
-      Alert.alert("Failed", "Could not request revision: " + e.message);
+      Toast.show({ type: 'error', text1: 'Failed', text2: "Could not request revision: " + e.message });
     }
   };
 
@@ -249,7 +251,13 @@ export default function ManagerTasks() {
 
   const filteredTasks = tasks.filter(t => {
     if (!t.title?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    return t.status !== 'completed';
+    
+    if (t.status === 'completed' && t.completed_at) {
+      const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
+      return new Date(t.completed_at).getTime() > twentyFourHoursAgo;
+    }
+    
+    return true;
   });
 
   const renderTask = ({ item }: { item: any }) => {
@@ -349,19 +357,22 @@ export default function ManagerTasks() {
         <Feather name="plus" size={24} color="white" />
       </TouchableOpacity>
 
-      <Modal visible={isModalVisible} animationType="slide" presentationStyle="pageSheet">
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 bg-white">
-          <View className="px-5 py-4 border-b border-slate-100 flex-row items-center justify-between">
-            <Text className="text-lg font-bold text-slate-800">Create New Task</Text>
-            <TouchableOpacity onPress={() => setModalVisible(false)} className="w-8 h-8 items-center justify-center bg-slate-100 rounded-full">
-              <Feather name="x" size={16} color="#64748b" />
-            </TouchableOpacity>
-          </View>
+      <Modal visible={isModalVisible} animationType="slide" transparent>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
+          <View className="flex-1 bg-black/50 justify-end">
+            <View className="bg-white rounded-t-3xl" style={{ height: '70%' }}>
+              <View className="px-5 py-4 border-b border-slate-100 flex-row items-center justify-between">
+              <Text className="text-lg font-bold text-slate-800">Create New Task</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)} className="w-8 h-8 items-center justify-center bg-slate-100 rounded-full">
+                <Feather name="x" size={16} color="#64748b" />
+              </TouchableOpacity>
+            </View>
 
           <ScrollView className="flex-1 p-5">
             <Text className="text-slate-500 font-bold text-xs uppercase tracking-wider mb-2">Task Title</Text>
             <TextInput
               placeholder="E.g., Implement new onboarding flow"
+              placeholderTextColor="#94a3b8"
               className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 mb-4 text-slate-800 font-medium"
               value={newTask.title}
               onChangeText={t => setNewTask({ ...newTask, title: t })}
@@ -370,6 +381,7 @@ export default function ManagerTasks() {
             <Text className="text-slate-500 font-bold text-xs uppercase tracking-wider mb-2">General Description (Optional)</Text>
             <TextInput
               placeholder="High level overview of this task..."
+              placeholderTextColor="#94a3b8"
               multiline
               numberOfLines={3}
               className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 mb-4 text-slate-800 min-h-[80px]"
@@ -462,6 +474,7 @@ export default function ManagerTasks() {
                       <Text className="text-slate-500 font-bold text-[10px] uppercase tracking-wider mb-2">Specific Instructions</Text>
                       <TextInput
                         placeholder={`What should ${member.member_name.split(' ')[0]} do?`}
+                        placeholderTextColor="#94a3b8"
                         multiline
                         className="bg-white border border-slate-200 rounded-lg p-3 text-sm text-slate-800"
                         value={instructionsMap[member.id] || ''}
@@ -485,9 +498,11 @@ export default function ManagerTasks() {
                 <Text className="text-white font-bold text-base">Assign Task</Text>
               )}
             </TouchableOpacity>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </Modal>
+            </ScrollView>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
 
       {/* Select Member Modal */}
       <Modal visible={isMemberModalVisible} transparent animationType="fade">
@@ -625,6 +640,7 @@ export default function ManagerTasks() {
             
             <TextInput
               placeholder="What needs to be revised?"
+              placeholderTextColor="#94a3b8"
               multiline
               numberOfLines={4}
               className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 mb-6 text-slate-800 text-sm"

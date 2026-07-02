@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../utils/supabase';
 import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Toast from 'react-native-toast-message';
 
 type Member = {
   id: string;
@@ -211,8 +212,8 @@ export default function ManagerDashboard() {
         .eq('id', memberId);
       
       setPendingMembers(prev => prev.filter(m => m.id !== memberId));
-    } catch (e) {
-      alert("Failed to approve");
+    } catch (e: any) {
+      Toast.show({ type: 'error', text1: 'Error', text2: "Failed to approve" });
     }
   };
 
@@ -224,8 +225,8 @@ export default function ManagerDashboard() {
         .eq('id', memberId);
       
       setPendingMembers(prev => prev.filter(m => m.id !== memberId));
-    } catch (e) {
-      alert("Failed to decline");
+    } catch (e: any) {
+      Toast.show({ type: 'error', text1: 'Error', text2: "Failed to decline" });
     }
   };
 
@@ -233,8 +234,8 @@ export default function ManagerDashboard() {
     try {
       await supabase.from('team_members').delete().eq('id', memberId);
       setMembers(prev => prev.filter(m => m.id !== memberId));
-    } catch (e) {
-      alert("Failed to remove member");
+    } catch (e: any) {
+      Toast.show({ type: 'error', text1: 'Error', text2: "Failed to remove member" });
     }
   };
 
@@ -242,8 +243,8 @@ export default function ManagerDashboard() {
     try {
       await supabase.from('team_members').update({ role_id: roleId }).eq('id', memberId);
       // Let the polling catch the UI update
-    } catch (e) {
-      alert("Failed to change role");
+    } catch (e: any) {
+      Toast.show({ type: 'error', text1: 'Error', text2: "Failed to change role" });
     }
   };
 
@@ -252,22 +253,22 @@ export default function ManagerDashboard() {
     try {
       await supabase.from('roles').insert([{ team_id: teamId, role_name: newRoleName.trim() }]);
       setNewRoleName('');
-    } catch (e) {
-      alert("Failed to add role");
+    } catch (e: any) {
+      Toast.show({ type: 'error', text1: 'Error', text2: "Failed to add role" });
     }
   };
 
   const handleDeleteRole = async (roleId: string) => {
     const isUsed = members.some(m => m.role_id === roleId);
     if (isUsed) {
-      alert("Cannot delete a role that is currently assigned to a member.");
+      Toast.show({ type: 'error', text1: 'Cannot Delete', text2: "Cannot delete a role that is currently assigned to a member." });
       return;
     }
     try {
       await supabase.from('roles').delete().eq('id', roleId);
       setRoles(prev => prev.filter(r => r.id !== roleId));
-    } catch (e) {
-      alert("Failed to delete role");
+    } catch (e: any) {
+      Toast.show({ type: 'error', text1: 'Error', text2: "Failed to delete role" });
     }
   };
 
@@ -279,7 +280,7 @@ export default function ManagerDashboard() {
       const { error } = await supabase.from('teams').update({ is_locked: newStatus }).eq('id', teamId);
       if (error) throw error;
     } catch (e: any) {
-      alert("Failed to toggle team lock status: " + e.message);
+      Toast.show({ type: 'error', text1: 'Error', text2: "Failed to toggle team lock status: " + e.message });
       setIsLocked(!isLocked); // revert on error
     }
   };

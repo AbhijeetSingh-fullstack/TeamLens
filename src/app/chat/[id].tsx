@@ -7,6 +7,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../utils/supabase';
 import { decode } from 'base64-arraybuffer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Toast from 'react-native-toast-message';
 
 type Message = {
   id: string;
@@ -105,7 +106,7 @@ export default function ChatScreen() {
         setSelectedImageBase64(result.assets[0].base64 || null);
       }
     } catch (e: any) {
-      alert(e.message || "An error occurred selecting image.");
+      Toast.show({ type: 'error', text1: 'Error', text2: e.message || "An error occurred selecting image." });
     }
   };
 
@@ -211,7 +212,7 @@ export default function ChatScreen() {
 
       fetchMessages();
     } catch (e: any) {
-      alert(e.message || "Failed to send message.");
+      Toast.show({ type: 'error', text1: 'Failed to Send', text2: e.message || "Failed to send message." });
       setNewMessage(contentText);
       setSelectedImage(imageUri);
     } finally {

@@ -6,6 +6,7 @@ import { ClerkProvider, ClerkLoaded } from '@clerk/clerk-expo'
 import * as SecureStore from 'expo-secure-store'
 import { Platform, View } from 'react-native'
 import { AppNotificationHandler } from '../hooks/useAppNotifications'
+import Toast from 'react-native-toast-message';
 
 const tokenCache = {
   async getToken(key: string) {
@@ -53,6 +54,7 @@ export default function RootLayout() {
           )}
           <AppNotificationHandler />
           <Stack screenOptions={{ headerShown: false }} />
+          <Toast />
         </SafeAreaProvider>
       </ClerkLoaded>
     </ClerkProvider>

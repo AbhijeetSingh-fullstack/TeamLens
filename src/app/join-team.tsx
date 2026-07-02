@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { supabase } from '../utils/supabase';
 import { useUser } from '@clerk/clerk-expo';
+import Toast from 'react-native-toast-message';
 
 type TeamInfo = {
   id: string;
@@ -47,7 +48,7 @@ export default function JoinTeamScreen() {
 
   const handleVerifyCode = async () => {
     if (!teamCode || teamCode.length < 6) {
-      alert("Please enter a valid 6-character team code.");
+      Toast.show({ type: 'error', text1: 'Invalid Code', text2: 'Please enter a valid 6-character team code.' });
       return;
     }
 
@@ -81,7 +82,7 @@ export default function JoinTeamScreen() {
       
       setAvailableRoles(rolesData || []);
     } catch (error: any) {
-      alert(error.message);
+      Toast.show({ type: 'error', text1: 'Error', text2: error.message });
     } finally {
       setIsVerifying(false);
     }
@@ -89,7 +90,7 @@ export default function JoinTeamScreen() {
 
   const handleJoinTeam = async () => {
     if (!memberName || !memberEmail || !selectedRoleId || !teamInfo) {
-      alert("Please fill in all details and select a role.");
+      Toast.show({ type: 'error', text1: 'Missing Details', text2: 'Please fill in all details and select a role.' });
       return;
     }
 
@@ -152,7 +153,7 @@ export default function JoinTeamScreen() {
       });
       // Do not set isJoining to false here, to avoid updating an unmounted component
     } catch (error: any) {
-      alert('Failed to join team: ' + error.message);
+      Toast.show({ type: 'error', text1: 'Failed to Join', text2: error.message });
       setIsJoining(false);
     }
   };

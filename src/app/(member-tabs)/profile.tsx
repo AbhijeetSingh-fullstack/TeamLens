@@ -5,6 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../utils/supabase';
 import { useClerk, useUser } from '@clerk/clerk-expo';
+import Toast from 'react-native-toast-message';
 
 export default function MemberProfile() {
   const { teamName, memberName, roleName, memberId, teamId } = useGlobalSearchParams<{ 
@@ -79,7 +80,7 @@ export default function MemberProfile() {
       
       router.replace({ pathname: '/', params: { skipAutoLogin: 'true' } });
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      Toast.show({ type: 'error', text1: 'Error', text2: err.message });
     }
   };
 

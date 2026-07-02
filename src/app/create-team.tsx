@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { supabase } from '../utils/supabase';
 import { useUser } from '@clerk/clerk-expo';
+import Toast from 'react-native-toast-message';
 
 export default function CreateTeamScreen() {
   const router = useRouter();
@@ -40,7 +41,7 @@ export default function CreateTeamScreen() {
 
   const handleCreateTeam = async () => {
     if (!teamName || !orgName || !managerName || !workspacePassword) {
-      alert("Please fill in all required fields.");
+      Toast.show({ type: 'error', text1: 'Missing Details', text2: 'Please fill in all required fields.' });
       return;
     }
     const validRoles = roles.filter(role => role.trim() !== '');
@@ -110,7 +111,7 @@ export default function CreateTeamScreen() {
       });
     } catch (error: any) {
       console.error('Error creating team:', error.message);
-      alert('Failed to create team: ' + error.message);
+      Toast.show({ type: 'error', text1: 'Failed', text2: 'Failed to create team: ' + error.message });
       setIsSubmitting(false);
     }
   };
@@ -121,7 +122,7 @@ export default function CreateTeamScreen() {
 
   const handleTestLogin = async () => {
     if (!testLoginCode || !loginPassword) {
-      alert("Please enter both team code and password.");
+      Toast.show({ type: 'error', text1: 'Missing Details', text2: 'Please enter both team code and password.' });
       return;
     }
     setIsSubmitting(true);
@@ -151,7 +152,7 @@ export default function CreateTeamScreen() {
       });
       // Do not set isSubmitting to false here, to avoid updating an unmounted component
     } catch (err: any) {
-      alert(err.message);
+      Toast.show({ type: 'error', text1: 'Error', text2: err.message });
       setIsSubmitting(false);
     }
   };

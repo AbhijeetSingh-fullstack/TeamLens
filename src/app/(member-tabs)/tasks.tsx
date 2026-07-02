@@ -7,6 +7,7 @@ import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Modal,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../utils/supabase';
 import { updateTaskAnalysis } from '../../utils/analytics';
+import Toast from 'react-native-toast-message';
 
 export default function MemberTasks() {
   const { memberId } = useGlobalSearchParams<{ memberId: string }>();
@@ -87,7 +88,7 @@ export default function MemberTasks() {
 
   const handleSubmitTask = async () => {
     if (!selectedAssignment) {
-      Alert.alert("Error", "No assignment selected.");
+      Toast.show({ type: 'error', text1: 'Error', text2: 'No assignment selected.' });
       return;
     }
 
@@ -231,11 +232,11 @@ export default function MemberTasks() {
 
       setSubmitModalVisible(false);
       fetchTasks();
-      Alert.alert("Success", "Task submitted successfully! Great job.");
+      Toast.show({ type: 'success', text1: 'Success', text2: 'Task submitted successfully! Great job.' });
 
     } catch (error: any) {
       console.error("Submit Error:", error);
-      Alert.alert("Error Occurred", error?.message || "An unexpected error occurred while submitting.");
+      Toast.show({ type: 'error', text1: 'Error Occurred', text2: error?.message || "An unexpected error occurred while submitting." });
     } finally {
       setIsSubmitting(false);
     }
