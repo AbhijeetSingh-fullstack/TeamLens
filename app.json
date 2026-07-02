@@ -19,7 +19,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.abhijeetsingh200.teamlens"
+      "package": "com.abhijeetsingh.teamlens",
+      "googleServicesFile": "./google-services.json"
     },
     "androidStatusBar": {
       "translucent": false
@@ -48,6 +49,9 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "notification": {
+      "vapidPublicKey": "BGOMf2PHQF84v_ANbO2g4shZxG4DXA_jQh8zEWDUpmGMXC4mBkMpISgd4aK-BdZ8LFFq_EIARwXWuXqvoCved2s"
     },
     "extra": {
       "router": {},

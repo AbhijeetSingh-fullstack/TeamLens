@@ -18,7 +18,7 @@ try {
 export async function registerForPushNotificationsAsync(userId?: string) {
   let token;
 
-  if (!Notifications || Platform.OS === 'web') {
+  if (!Notifications) {
     return;
   }
 
