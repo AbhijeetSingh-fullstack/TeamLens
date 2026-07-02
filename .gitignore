@@ -43,3 +43,9 @@ example
 # generated native folders
 /ios
 /android
+
+# Sensitive API key and test scripts
+google-services.json
+alter.js
+test_teams.js
+create_push_tokens.js
