@@ -101,7 +101,7 @@ export default function SignInScreen() {
               style={{ width: 64, height: 64, borderRadius: 16, marginBottom: 24 }}
               resizeMode="contain"
             />
-            <Text className="text-3xl font-extrabold text-slate-900 mb-3 tracking-tight">Welcome Back</Text>
+            <Text className="text-2xl font-extrabold text-slate-900 mb-3 tracking-tight text-center" numberOfLines={1}>Welcome Back</Text>
             <Text className="text-slate-500 text-base text-center">
               Sign in to continue to your TeamLens dashboard
             </Text>
