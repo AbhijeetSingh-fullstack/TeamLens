@@ -41,6 +41,7 @@ if (!publishableKey) {
   )
 }
 
+
 export default function RootLayout() {
   return (
     <ClerkProvider 

@@ -186,7 +186,15 @@ export default function WelcomeScreen() {
   if (!isLoaded || isCheckingAutoLogin || (!isSignedIn && !hasCheckedAuth.current)) {
     return (
       <View className="flex-1 justify-center items-center bg-[#F5F7FF]">
-        <ActivityIndicator size="large" color="#4f46e5" />
+        <View className="w-24 h-24 bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-slate-100 items-center justify-center mb-6">
+          <Image 
+            source={require('../../assets/images/TeamLens.png')} 
+            style={{ width: 64, height: 64, borderRadius: 16 }}
+            resizeMode="contain"
+          />
+        </View>
+        <Text className="text-2xl font-extrabold text-slate-800 mb-8 tracking-tight">TeamLens</Text>
+        <ActivityIndicator size="small" color="#4f46e5" />
       </View>
     );
   }

@@ -44,7 +44,13 @@ export async function registerForPushNotificationsAsync(userId?: string) {
         return;
       }
       
-      const projectId = 'dd7ed27c-6c86-448d-86c6-d67641d80594'; // Your EAS project ID from app.json
+      const Constants = require('expo-constants').default;
+      const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+      
+      if (!projectId) {
+        console.log('No EAS Project ID found in app.json extra config');
+      }
+      
       token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
       console.log('====================================');
       console.log('EXPO PUSH TOKEN:');
