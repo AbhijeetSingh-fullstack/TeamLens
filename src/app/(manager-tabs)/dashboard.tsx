@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, ScrollView, Image, StatusBar, Modal, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Image, StatusBar, Modal, TextInput, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
@@ -40,6 +40,19 @@ export default function ManagerDashboard() {
   const [newRoleName, setNewRoleName] = useState('');
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
+
+  const handleInvite = async () => {
+    const inviteMessage = `🚀 You're invited to join my workspace "${displayTeamName}" on TeamLens!\n\nUse this secure invite code to join: ${displayTeamCode}\n\nDownload TeamLens to get started and collaborate with us.`;
+
+    try {
+      await Share.share({
+        message: inviteMessage,
+        title: `Join ${displayTeamName} on TeamLens`,
+      });
+    } catch (error) {
+      console.log('Error sharing:', error);
+    }
+  };
 
   // Poll for new members and roles
   useEffect(() => {
@@ -335,17 +348,20 @@ export default function ManagerDashboard() {
               <Feather name={isLocked ? "lock" : "unlock"} size={20} color={isLocked ? "#ef4444" : "#10b981"} />
             </TouchableOpacity>
             
-            <View className="flex-1 bg-[#F4F5FA] rounded-xl flex-row items-center justify-between p-4 border border-indigo-50">
+            <TouchableOpacity 
+              onPress={handleInvite}
+              className="flex-1 bg-[#F4F5FA] rounded-xl flex-row items-center justify-between p-4 border border-indigo-50"
+            >
               <Text className="text-indigo-400 font-bold text-xs uppercase tracking-wider">Invite Code</Text>
               <View className="flex-row items-center gap-3">
                 <Text className="text-indigo-600 font-bold text-base tracking-widest">{displayTeamCode || 'WP-829X-92'}</Text>
                 <Feather name="copy" size={16} color="#94a3b8" />
               </View>
-            </View>
+            </TouchableOpacity>
           </View>
 
           <View className="flex-row items-center gap-3">
-            <TouchableOpacity className="flex-1 bg-indigo-600 py-3.5 rounded-xl flex-row items-center justify-center gap-2 shadow-sm shadow-indigo-200 active:bg-indigo-700">
+            <TouchableOpacity onPress={handleInvite} className="flex-1 bg-indigo-600 py-3.5 rounded-xl flex-row items-center justify-center gap-2 shadow-sm shadow-indigo-200 active:bg-indigo-700">
               <Feather name="user-plus" size={16} color="white" />
               <Text className="text-white font-bold text-sm">Invite More</Text>
             </TouchableOpacity>
