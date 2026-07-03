@@ -160,9 +160,15 @@ export default function CreateTeamScreen() {
 
       // Initiate Clerk OTP
       const signInAttempt = await signIn.create({
-        identifier: data.creator_email,
-        strategy: 'email_code',
+        identifier: data.creator_email
       });
+
+      const emailFactor = signInAttempt.supportedFirstFactors?.find((f: any) => f.strategy === 'email_code') as any;
+      if (emailFactor) {
+        await signIn.prepareFirstFactor({ strategy: 'email_code', emailAddressId: emailFactor.emailAddressId });
+      } else {
+        throw new Error("Email code verification is not enabled in Clerk. Please enable it in your Clerk dashboard.");
+      }
 
       setVerifiedTeamData(data);
       setPendingOtp(true);
@@ -182,9 +188,10 @@ export default function CreateTeamScreen() {
       if (completeSignIn.status === 'complete') {
         await setActive({ session: completeSignIn.createdSessionId });
         
-        if (user) {
+        const userId = completeSignIn.createdUserId;
+        if (userId) {
           const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-          await AsyncStorage.setItem(`manager_team_${user.id}`, JSON.stringify({
+          await AsyncStorage.setItem(`manager_team_${userId}`, JSON.stringify({
             teamCode: verifiedTeamData.team_code,
             teamName: verifiedTeamData.team_name
           }));

@@ -1,17 +1,26 @@
 import { View, Text, TouchableOpacity, StatusBar, ScrollView, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, useGlobalSearchParams, useSegments } from 'expo-router';
+import { useRouter, useGlobalSearchParams, usePathname, useFocusEffect } from 'expo-router';
 import { useAuth, useClerk, useUser } from '@clerk/clerk-expo';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../utils/supabase';
 
 export default function WelcomeScreen() {
   const router = useRouter();
-  const segments = useSegments();
+  const pathname = usePathname();
   const { skipAutoLogin } = useGlobalSearchParams<{ skipAutoLogin?: string }>();
   const { isSignedIn, isLoaded } = useAuth();
   const { user } = useUser();
   const { signOut } = useClerk();
+  
+  const [isFocused, setIsFocused] = useState(false);
+  
+  useFocusEffect(
+    useCallback(() => {
+      setIsFocused(true);
+      return () => setIsFocused(false);
+    }, [])
+  );
   
   const [isCheckingAutoLogin, setIsCheckingAutoLogin] = useState(true);
 
@@ -149,20 +158,25 @@ export default function WelcomeScreen() {
       }
     }
 
-    checkAutoLogin();
-  }, [isLoaded, isSignedIn, user]);
+    if (isFocused) {
+      checkAutoLogin();
+    }
+  }, [isLoaded, isSignedIn, user, isFocused]);
+
+  const hasCheckedAuth = React.useRef(false);
 
   useEffect(() => {
-    // Only redirect from the root index page!
-    // If segments.length > 0, we are already on another screen (like /sign-up)
-    const isRoot = segments.length === 0;
+    if (hasCheckedAuth.current) return;
     
-    if (isLoaded && !isCheckingAutoLogin && !isSignedIn && isRoot) {
-      router.replace('/(auth)/sign-in');
+    if (isLoaded && !isCheckingAutoLogin) {
+      hasCheckedAuth.current = true;
+      if (!isSignedIn) {
+        router.replace('/(auth)/sign-in');
+      }
     }
-  }, [isLoaded, isCheckingAutoLogin, isSignedIn, segments]);
+  }, [isLoaded, isCheckingAutoLogin, isSignedIn]);
 
-  if (!isLoaded || isCheckingAutoLogin || !isSignedIn) {
+  if (!isLoaded || isCheckingAutoLogin || (!isSignedIn && !hasCheckedAuth.current)) {
     return (
       <View className="flex-1 justify-center items-center bg-[#F5F7FF]">
         <ActivityIndicator size="large" color="#4f46e5" />
@@ -248,7 +262,13 @@ export default function WelcomeScreen() {
         {/* Footer Area */}
         <View className="items-center gap-3 mt-auto pt-6">
           {isSignedIn && (
-            <TouchableOpacity onPress={() => signOut()} className="flex-row items-center gap-2">
+            <TouchableOpacity 
+              onPress={async () => {
+                await signOut();
+                router.replace('/(auth)/sign-in');
+              }} 
+              className="flex-row items-center gap-2"
+            >
               <Text className="text-slate-400 text-xs font-semibold uppercase tracking-wider">↳ SIGN OUT</Text>
             </TouchableOpacity>
           )}
