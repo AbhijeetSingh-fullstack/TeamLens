@@ -229,8 +229,13 @@ export default function ManagerProfile() {
               </TouchableOpacity>
               <TouchableOpacity 
                 style={{ flex: 1, backgroundColor: '#dc2626', paddingVertical: 12, borderRadius: 12, alignItems: 'center', marginLeft: 8 }}
-                onPress={() => {
+                onPress={async () => {
                   setIsExitModalVisible(false);
+                  if (user) {
+                    const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+                    await AsyncStorage.setItem(`has_left_team_${user.id}`, 'true');
+                    await AsyncStorage.removeItem(`manager_team_${user.id}`);
+                  }
                   router.replace({ pathname: '/', params: { skipAutoLogin: 'true' } });
                 }}
               >

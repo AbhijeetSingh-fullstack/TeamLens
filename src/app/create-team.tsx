@@ -107,6 +107,7 @@ export default function CreateTeamScreen() {
       // 4. Save to local storage for auto-login using the current user's ID
       if (user) {
         const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+        await AsyncStorage.removeItem(`has_left_team_${user.id}`);
         await AsyncStorage.setItem(`manager_team_${user.id}`, JSON.stringify({
           teamCode: generatedCode,
           teamName: teamName
@@ -191,6 +192,7 @@ export default function CreateTeamScreen() {
         const userId = completeSignIn.createdUserId;
         if (userId) {
           const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+          await AsyncStorage.removeItem(`has_left_team_${userId}`);
           await AsyncStorage.setItem(`manager_team_${userId}`, JSON.stringify({
             teamCode: verifiedTeamData.team_code,
             teamName: verifiedTeamData.team_name

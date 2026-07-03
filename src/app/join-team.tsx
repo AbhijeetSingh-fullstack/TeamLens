@@ -119,6 +119,7 @@ export default function JoinTeamScreen() {
 
       if (user && insertedMember) {
         const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+        await AsyncStorage.removeItem(`has_left_team_${user.id}`);
         await AsyncStorage.setItem(`member_team_${user.id}`, JSON.stringify({
           memberId: insertedMember.id
         }));

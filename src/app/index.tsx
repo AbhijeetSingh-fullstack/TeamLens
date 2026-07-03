@@ -35,6 +35,13 @@ export default function WelcomeScreen() {
       try {
         const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
         
+        // 0. Check if user explicitly chose to leave the team
+        const hasLeftTeam = await AsyncStorage.getItem(`has_left_team_${user.id}`);
+        if (hasLeftTeam === 'true') {
+          setIsCheckingAutoLogin(false);
+          return;
+        }
+
         // 1. Check if they are an active team member using AsyncStorage or DB fallback
         const memberDataStr = await AsyncStorage.getItem(`member_team_${user.id}`);
         let memberMatched = false;

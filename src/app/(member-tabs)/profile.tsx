@@ -78,6 +78,12 @@ export default function MemberProfile() {
         
       if (error) throw error;
       
+      if (user) {
+        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+        await AsyncStorage.setItem(`has_left_team_${user.id}`, 'true');
+        await AsyncStorage.removeItem(`member_team_${user.id}`);
+      }
+      
       router.replace({ pathname: '/', params: { skipAutoLogin: 'true' } });
     } catch (err: any) {
       Toast.show({ type: 'error', text1: 'Error', text2: err.message });
