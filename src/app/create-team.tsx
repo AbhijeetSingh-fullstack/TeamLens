@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, ScrollView, StatusBar, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { supabase } from '../utils/supabase';
+import { supabase, createClerkSupabaseClient } from '../utils/supabase';
 import { useUser, useSignIn, useAuth } from '@clerk/clerk-expo';
 import Toast from 'react-native-toast-message';
 
@@ -12,11 +12,10 @@ export default function CreateTeamScreen() {
   const [teamName, setTeamName] = useState('');
   const [orgName, setOrgName] = useState('');
   const [managerName, setManagerName] = useState('');
-  const [workspacePassword, setWorkspacePassword] = useState('');
   const [roles, setRoles] = useState<string[]>(['']);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { signIn, setActive, isLoaded } = useSignIn();
-  const { signOut } = useAuth();
+  const { signOut, getToken } = useAuth();
   
   // OTP state
   const [pendingOtp, setPendingOtp] = useState(false);
@@ -47,7 +46,7 @@ export default function CreateTeamScreen() {
   };
 
   const handleCreateTeam = async () => {
-    if (!teamName || !orgName || !managerName || !workspacePassword) {
+    if (!teamName || !orgName || !managerName) {
       Toast.show({ type: 'error', text1: 'Missing Details', text2: 'Please fill in all required fields.' });
       return;
     }
@@ -62,8 +61,16 @@ export default function CreateTeamScreen() {
 
     setIsSubmitting(true);
     try {
+      const token = await getToken({ template: 'supabase' });
+      
+      if (!token) {
+        throw new Error("Clerk 'supabase' JWT template is missing or not configured. Token is null.");
+      }
+      
+      const authenticatedSupabase = createClerkSupabaseClient(token);
+
       // 1. Insert Organization
-      const { data: orgData, error: orgError } = await supabase
+      const { data: orgData, error: orgError } = await authenticatedSupabase
         .from('organizations')
         .insert([{ 
           organization_name: orgName,
@@ -75,14 +82,13 @@ export default function CreateTeamScreen() {
       if (orgError) throw orgError;
 
       // 2. Insert Team
-      const { data: teamData, error: teamError } = await supabase
+      const { data: teamData, error: teamError } = await authenticatedSupabase
         .from('teams')
         .insert([{ 
           organization_id: orgData.id, 
           team_name: teamName, 
           manager_name: managerName,
           team_code: generatedCode,
-          workspace_password: workspacePassword,
           creator_email: user?.primaryEmailAddress?.emailAddress
         }])
         .select()
@@ -97,7 +103,7 @@ export default function CreateTeamScreen() {
           role_name: role
         }));
 
-        const { error: rolesError } = await supabase
+        const { error: rolesError } = await authenticatedSupabase
           .from('roles')
           .insert(rolesToInsert);
 
@@ -127,24 +133,22 @@ export default function CreateTeamScreen() {
 
   const [isTestLogin, setIsTestLogin] = useState(false);
   const [testLoginCode, setTestLoginCode] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
 
   const handleTestLogin = async () => {
-    if (!testLoginCode || !loginPassword) {
-      Toast.show({ type: 'error', text1: 'Missing Details', text2: 'Please enter both team code and password.' });
+    if (!testLoginCode) {
+      Toast.show({ type: 'error', text1: 'Missing Details', text2: 'Please enter a team code.' });
       return;
     }
     setIsSubmitting(true);
     try {
       const { data, error } = await supabase
         .from('teams')
-        .select('*')
+        .select('id, team_code, team_name, creator_email')
         .eq('team_code', testLoginCode.toUpperCase())
-        .eq('workspace_password', loginPassword)
         .single();
         
       if (error || !data) {
-        throw new Error("Invalid team code or password.");
+        throw new Error("Invalid team code.");
       }
 
       if (!data.creator_email) {
@@ -277,16 +281,6 @@ export default function CreateTeamScreen() {
                     onChangeText={setTestLoginCode}
                     placeholder="e.g. A1B2C3"
                     autoCapitalize="characters"
-                    className="w-full bg-[#F4F5FA] border border-slate-200/60 rounded-xl px-4 py-3 text-slate-800 mb-4"
-                    placeholderTextColor="#94a3b8"
-                  />
-
-                  <Text className="text-slate-500 text-sm mb-2">Workspace Password</Text>
-                  <TextInput
-                    value={loginPassword}
-                    onChangeText={setLoginPassword}
-                    placeholder="Enter workspace password"
-                    secureTextEntry
                     className="w-full bg-[#F4F5FA] border border-slate-200/60 rounded-xl px-4 py-3 text-slate-800 mb-6"
                     placeholderTextColor="#94a3b8"
                   />
@@ -410,19 +404,6 @@ export default function CreateTeamScreen() {
                       value={managerName}
                       onChangeText={setManagerName}
                       placeholder="Search by name or email..."
-                      className="w-full bg-[#F4F5FA] border border-slate-200/60 rounded-xl px-4 py-3 text-slate-800"
-                      placeholderTextColor="#94a3b8"
-                    />
-                  </View>
-
-                  {/* Workspace Password */}
-                  <View>
-                    <Text className="text-slate-500 text-sm mb-2">Workspace Password</Text>
-                    <TextInput
-                      value={workspacePassword}
-                      onChangeText={setWorkspacePassword}
-                      placeholder="Set a password for your workspace"
-                      secureTextEntry
                       className="w-full bg-[#F4F5FA] border border-slate-200/60 rounded-xl px-4 py-3 text-slate-800"
                       placeholderTextColor="#94a3b8"
                     />
