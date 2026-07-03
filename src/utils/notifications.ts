@@ -143,7 +143,7 @@ export async function sendExpoPushNotification(params: { recipientUserId?: strin
     });
     console.log(`Push notification sent to ${userId}`);
   } catch (error) {
-    console.error('Error sending push notification:', error);
+    console.log('Error sending push notification:', error);
   }
 }
 
