@@ -1,9 +1,32 @@
-import { View, Text, TouchableOpacity, StatusBar, ScrollView, ActivityIndicator, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StatusBar, ScrollView, ActivityIndicator, Image, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useGlobalSearchParams, usePathname, useFocusEffect } from 'expo-router';
 import { useAuth, useClerk, useUser } from '@clerk/clerk-expo';
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../utils/supabase';
+
+const LoadingProgressBar = ({ progress }: { progress: number }) => {
+  const animatedProgress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(animatedProgress, {
+      toValue: progress,
+      duration: 400,
+      useNativeDriver: false, // width animation requires false
+    }).start();
+  }, [progress]);
+
+  const width = animatedProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
+
+  return (
+    <View style={{ width: 192, height: 8, backgroundColor: '#eef2ff', borderColor: '#c7d2fe', borderWidth: 1, borderRadius: 4, overflow: 'hidden', marginTop: 12 }}>
+      <Animated.View style={{ width, height: 8, backgroundColor: '#4f46e5', borderRadius: 4 }} />
+    </View>
+  );
+};
 
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -23,6 +46,7 @@ export default function WelcomeScreen() {
   );
   
   const [isCheckingAutoLogin, setIsCheckingAutoLogin] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0);
 
   useEffect(() => {
     async function checkAutoLogin() {
@@ -33,17 +57,27 @@ export default function WelcomeScreen() {
       }
 
       try {
+        const finishAndNavigate = async (action: () => void) => {
+          setLoadingProgress(1.0);
+          await new Promise(resolve => setTimeout(resolve, 450));
+          action();
+        };
+
+        setLoadingProgress(0.2);
         const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
         
         // 0. Check if user explicitly chose to leave the team
         const hasLeftTeam = await AsyncStorage.getItem(`has_left_team_${user.id}`);
+        setLoadingProgress(0.4);
+        
         if (hasLeftTeam === 'true') {
-          setIsCheckingAutoLogin(false);
+          await finishAndNavigate(() => setIsCheckingAutoLogin(false));
           return;
         }
 
         // 1. Check if they are an active team member using AsyncStorage or DB fallback
         const memberDataStr = await AsyncStorage.getItem(`member_team_${user.id}`);
+        setLoadingProgress(0.6);
         let memberMatched = false;
         
         if (memberDataStr) {
@@ -57,23 +91,27 @@ export default function WelcomeScreen() {
           if (memberData && memberData.teams && memberData.status !== 'rejected') {
             memberMatched = true;
             if (memberData.status === 'pending') {
-              router.replace({
-                pathname: '/pending-approval',
-                params: {
-                  teamName: memberData.teams.team_name,
-                  memberName: memberData.member_name,
-                  roleName: 'Member'
-                }
+              await finishAndNavigate(() => {
+                router.replace({
+                  pathname: '/pending-approval',
+                  params: {
+                    teamName: memberData.teams.team_name,
+                    memberName: memberData.member_name,
+                    roleName: 'Member'
+                  }
+                });
               });
             } else {
-              router.replace({
-                pathname: '/(member-tabs)/dashboard',
-                params: {
-                  teamName: memberData.teams.team_name,
-                  memberName: memberData.member_name,
-                  memberId: memberData.id,
-                  teamId: memberData.team_id
-                }
+              await finishAndNavigate(() => {
+                router.replace({
+                  pathname: '/(member-tabs)/dashboard',
+                  params: {
+                    teamName: memberData.teams.team_name,
+                    memberName: memberData.member_name,
+                    memberId: memberData.id,
+                    teamId: memberData.team_id
+                  }
+                });
               });
             }
             return;
@@ -95,23 +133,27 @@ export default function WelcomeScreen() {
             await AsyncStorage.setItem(`member_team_${user.id}`, JSON.stringify({ memberId: memberDataDb.id }));
             
             if (memberDataDb.status === 'pending') {
-              router.replace({
-                pathname: '/pending-approval',
-                params: {
-                  teamName: memberDataDb.teams.team_name,
-                  memberName: memberDataDb.member_name,
-                  roleName: 'Member'
-                }
+              await finishAndNavigate(() => {
+                router.replace({
+                  pathname: '/pending-approval',
+                  params: {
+                    teamName: memberDataDb.teams.team_name,
+                    memberName: memberDataDb.member_name,
+                    roleName: 'Member'
+                  }
+                });
               });
             } else {
-              router.replace({
-                pathname: '/(member-tabs)/dashboard',
-                params: {
-                  teamName: memberDataDb.teams.team_name,
-                  memberName: memberDataDb.member_name,
-                  memberId: memberDataDb.id,
-                  teamId: memberDataDb.team_id
-                }
+              await finishAndNavigate(() => {
+                router.replace({
+                  pathname: '/(member-tabs)/dashboard',
+                  params: {
+                    teamName: memberDataDb.teams.team_name,
+                    memberName: memberDataDb.member_name,
+                    memberId: memberDataDb.id,
+                    teamId: memberDataDb.team_id
+                  }
+                });
               });
             }
             return;
@@ -120,15 +162,18 @@ export default function WelcomeScreen() {
 
         // 2. Check if they are a manager using AsyncStorage or DB fallback
         const managerDataStr = await AsyncStorage.getItem(`manager_team_${user.id}`);
+        setLoadingProgress(0.8);
         
         if (managerDataStr) {
           const managerData = JSON.parse(managerDataStr);
-          router.replace({
-            pathname: '/(manager-tabs)/dashboard',
-            params: {
-              teamCode: managerData.teamCode,
-              teamName: managerData.teamName
-            }
+          await finishAndNavigate(() => {
+            router.replace({
+              pathname: '/(manager-tabs)/dashboard',
+              params: {
+                teamCode: managerData.teamCode,
+                teamName: managerData.teamName
+              }
+            });
           });
           return;
         } else {
@@ -147,20 +192,22 @@ export default function WelcomeScreen() {
                teamCode: team.team_code,
                teamName: team.team_name,
              }));
-             router.replace({
-               pathname: '/(manager-tabs)/dashboard',
-               params: {
-                 teamCode: team.team_code,
-                 teamName: team.team_name
-               }
+             await finishAndNavigate(() => {
+               router.replace({
+                 pathname: '/(manager-tabs)/dashboard',
+                 params: {
+                   teamCode: team.team_code,
+                   teamName: team.team_name
+                 }
+               });
              });
              return;
            }
         }
-
-      } catch (err) {
-        console.error("Auto-login error:", err);
-      } finally {
+        await finishAndNavigate(() => setIsCheckingAutoLogin(false));
+      } catch (error) {
+        setLoadingProgress(1.0);
+        console.error('Error during auto-login check:', error);
         setIsCheckingAutoLogin(false);
       }
     }
@@ -193,8 +240,8 @@ export default function WelcomeScreen() {
             resizeMode="contain"
           />
         </View>
-        <Text className="text-2xl font-extrabold text-slate-800 mb-8 tracking-tight">TeamLens</Text>
-        <ActivityIndicator size="small" color="#4f46e5" />
+        <Text className="text-2xl font-extrabold text-slate-800 mb-2 tracking-tight">TeamLens</Text>
+        <LoadingProgressBar progress={loadingProgress} />
       </View>
     );
   }
