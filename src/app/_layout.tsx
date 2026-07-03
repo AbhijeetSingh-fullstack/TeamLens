@@ -54,7 +54,7 @@ export default function RootLayout() {
             <View nativeID="clerk-captcha" />
           )}
           <AppNotificationHandler />
-          <Stack screenOptions={{ headerShown: false }} />
+          <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }} />
           <Toast />
         </SafeAreaProvider>
       </ClerkLoaded>

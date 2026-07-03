@@ -111,7 +111,7 @@ export default function ManagerTabsLayout() {
   return (
     <Tabs 
       tabBar={(props) => <CustomTabBar {...props} />}
-      screenOptions={{ headerShown: false }}
+      screenOptions={{ headerShown: false, animation: 'shift' }}
     >
       <Tabs.Screen name="dashboard" />
       <Tabs.Screen name="tasks" />
