@@ -1,56 +1,68 @@
-# Welcome to your Expo app 👋
+# TeamLens 🎯
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+TeamLens is a modern, cross-platform mobile application built with React Native and Expo. It leverages powerful tools like Clerk for authentication, Supabase for backend services, and NativeWind for beautiful, responsive styling.
 
-## Get started
+## 🌟 Features
 
-1. Install dependencies
+- **Cross-Platform:** Runs seamlessly on iOS, Android, and Web.
+- **Secure Authentication:** Powered by [Clerk](https://clerk.com/) for a robust and secure sign-in/sign-up experience.
+- **Modern UI:** Styled using [NativeWind](https://www.nativewind.dev/) (Tailwind CSS for React Native) to ensure a clean and responsive design.
+- **Backend as a Service:** Integrated with [Supabase](https://supabase.com/) for scalable database and backend functionalities.
 
+## 🛠️ Tech Stack
+
+- **Framework:** [React Native](https://reactnative.dev/) & [Expo](https://expo.dev/) (Expo Router)
+- **Styling:** [NativeWind](https://www.nativewind.dev/) v4 & Tailwind CSS
+- **Authentication:** [Clerk Expo](https://clerk.com/docs/quickstarts/expo)
+- **Database:** [Supabase](https://supabase.com/)
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js (v18 or newer recommended)
+- npm, yarn, pnpm, or bun
+- [Expo CLI](https://docs.expo.dev/get-started/installation/)
+
+### Installation
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/your-username/teamlens.git
+   cd teamlens
+   ```
+
+2. **Install dependencies:**
    ```bash
    npm install
+   # or
+   yarn install
    ```
 
-2. Start the app
+### ⚙️ Configuration
 
+The project requires some environment variables to function correctly, particularly for authentication. 
+
+1. Create a copy of the `.env.example` file and name it `.env`:
    ```bash
-   npx expo start
+   cp .env.example .env
    ```
+2. Open the newly created `.env` file and replace the placeholder values with your actual API keys (e.g., your Clerk Publishable Key).
 
-In the output, you'll find options to open the app in a
+> **Note:** Never commit your `.env` file to version control.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+### 🏃‍♂️ Running the App
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+Start the Expo development server:
 
 ```bash
-npm run reset-project
+npm start
+# or
+yarn start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Press `a` to open on Android, `i` to open on iOS, or `w` to open on the web.
 
-### Other setup steps
+## 📄 License
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+This project is licensed under the MIT License.
