@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://via.placeholder.com/150" alt="TeamLens Logo" width="120" height="120" />
+  <img src="assets/images/TeamLens.png" alt="TeamLens Logo" width="120" height="120" />
 
   # 🎯 TeamLens
 
@@ -39,14 +39,27 @@ TeamLens utilizes a **role-based architecture** to provide the right tools to th
 
 ---
 
-## 📱 App Preview
+## 🔄 App Flow
 
-*(Replace the placeholder URLs with actual screenshots of your application)*
+The following flowchart demonstrates the core navigation and role-based access control within the application:
 
-| Manager Dashboard | Analytics View | Real-time Chat (Members) | Join Team Flow |
-| :---: | :---: | :---: | :---: |
-| <img src="https://via.placeholder.com/250x500.png?text=Dashboard+Screen" width="200"/> | <img src="https://via.placeholder.com/250x500.png?text=Analytics+Screen" width="200"/> | <img src="https://via.placeholder.com/250x500.png?text=Chat+Screen" width="200"/> | <img src="https://via.placeholder.com/250x500.png?text=Join+Team+Screen" width="200"/> |
-| *High-level overview of projects.* | *Performance and progress metrics.* | *Real-time messaging interface.* | *Frictionless onboarding.* |
+```mermaid
+graph TD
+    A[Launch App] --> B{Authenticated?}
+    B -- No --> C[Clerk Auth / Sign In]
+    C --> B
+    B -- Yes --> D{User Role?}
+    
+    D -- Manager --> E[Manager Dashboard]
+    E --> F[Projects Overview]
+    E --> G[Team Analytics]
+    E --> H[Direct Messaging]
+    
+    D -- Member --> I[Member Dashboard]
+    I --> J[Join Team / Onboarding]
+    I --> K[Task Execution]
+    I --> L[Team Chat]
+```
 
 ---
 
