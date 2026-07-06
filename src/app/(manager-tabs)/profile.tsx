@@ -121,67 +121,42 @@ export default function ManagerProfile() {
         </View>
 
         {/* Workspace Info */}
-        <Text className="text-slate-800 font-bold text-lg mb-4">Workspace Details</Text>
-        <View className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 mb-6">
-          
-          <View className="flex-row items-center justify-between border-b border-slate-50 pb-4 mb-4">
-            <View>
-              <Text className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">TEAM NAME</Text>
-              <Text className="text-slate-800 font-bold text-base">{displayTeamName}</Text>
+        <Text className="text-slate-800 font-bold text-lg mb-4">Workspace Info</Text>
+        <View className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-6">
+          <View className="flex-row items-center justify-between p-4 border-b border-slate-50">
+            <View className="flex-row items-center gap-3">
+              <View className="w-8 h-8 rounded-full bg-slate-50 items-center justify-center">
+                <Feather name="flag" size={16} color="#64748b" />
+              </View>
+              <Text className="text-slate-700 font-medium text-sm">Team Name</Text>
             </View>
-            <View className="w-10 h-10 rounded-full bg-slate-50 items-center justify-center">
-              <Feather name="flag" size={18} color="#64748b" />
-            </View>
+            <Text className="text-slate-500 font-bold">{displayTeamName}</Text>
           </View>
 
-          <View className="flex-row items-center justify-between">
-            <View>
-              <Text className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">TEAM CODE</Text>
-              <Text className="text-indigo-600 font-bold text-xl tracking-[0.2em]">{displayTeamCode}</Text>
+          <View className="flex-row items-center justify-between p-4 border-b border-slate-50">
+            <View className="flex-row items-center gap-3">
+              <View className="w-8 h-8 rounded-full bg-slate-50 items-center justify-center">
+                <Feather name="hash" size={16} color="#64748b" />
+              </View>
+              <Text className="text-slate-700 font-medium text-sm">Team Code</Text>
             </View>
-            <TouchableOpacity className="bg-indigo-50 px-3 py-2 rounded-xl">
-              <Text className="text-indigo-600 font-bold text-xs">Share</Text>
-            </TouchableOpacity>
-          </View>
-          
-        </View>
-
-        {/* Quick Stats */}
-        <Text className="text-slate-800 font-bold text-lg mb-4">Team Overview</Text>
-        <View className="flex-row gap-4 mb-6">
-          <View className="flex-1 bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-            <View className="w-10 h-10 rounded-full bg-blue-50 items-center justify-center mb-3">
-              <Feather name="users" size={18} color="#3b82f6" />
-            </View>
-            <Text className="text-2xl font-extrabold text-slate-800 mb-1">{stats.activeMembers}</Text>
-            <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Members</Text>
-          </View>
-
-          <View className="flex-1 bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-            <View className="w-10 h-10 rounded-full bg-orange-50 items-center justify-center mb-3">
-              <Feather name="list" size={18} color="#f97316" />
-            </View>
-            <Text className="text-2xl font-extrabold text-slate-800 mb-1">{stats.openTasks}</Text>
-            <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Open Tasks</Text>
+            <Text className="text-slate-500 font-bold">{displayTeamCode} (Creator: {managerName})</Text>
           </View>
         </View>
 
         {/* Settings Links */}
         <Text className="text-slate-800 font-bold text-lg mb-4">Settings</Text>
         <View className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <TouchableOpacity 
-            onPress={() => router.push({ pathname: '/(manager-tabs)/workspace-settings', params: { teamCode: displayTeamCode } })}
-            className="flex-row items-center justify-between p-4 border-b border-slate-50"
-          >
+          <TouchableOpacity className="flex-row items-center justify-between p-4 border-b border-slate-50">
             <View className="flex-row items-center gap-3">
-              <View className="w-8 h-8 rounded-full bg-indigo-50 items-center justify-center">
-                <Feather name="settings" size={16} color="#4f46e5" />
+              <View className="w-8 h-8 rounded-full bg-slate-50 items-center justify-center">
+                <Feather name="bell" size={16} color="#64748b" />
               </View>
-              <Text className="text-slate-700 font-medium text-sm">Workspace Settings</Text>
+              <Text className="text-slate-700 font-medium text-sm">Notifications</Text>
             </View>
             <Feather name="chevron-right" size={16} color="#cbd5e1" />
           </TouchableOpacity>
-          
+
           <TouchableOpacity 
             onPress={() => router.push('/privacy-policy')}
             className="flex-row items-center justify-between p-4 border-b border-slate-50"

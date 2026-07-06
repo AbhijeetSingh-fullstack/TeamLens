@@ -20,36 +20,38 @@ export default function MemberProfile() {
   const { signOut } = useClerk();
   const { user } = useUser();
 
-  const [stats, setStats] = useState({
-    assignedTasks: 0,
-    completedTasks: 0,
-    productivityScore: 0
+  const [teamInfo, setTeamInfo] = useState({
+    teamCode: '',
+    creatorName: ''
   });
 
   useEffect(() => {
     if (!memberId) return;
 
-    const fetchStats = async () => {
-      const { data: tasks } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('assigned_to', memberId);
-
-      const assignedCount = tasks?.length || 0;
-      const completedCount = tasks?.filter(t => t.status === 'completed').length || 0;
-      const score = assignedCount > 0 ? Math.round((completedCount / assignedCount) * 100) : 0;
-
-      setStats({
-        assignedTasks: assignedCount,
-        completedTasks: completedCount,
-        productivityScore: score
-      });
+    const fetchTeamInfo = async () => {
+      try {
+        let tId = teamId;
+        if (!tId) {
+          const { data } = await supabase.from('team_members').select('team_id').eq('id', memberId).single();
+          tId = data?.team_id;
+        }
+        if (tId) {
+          const { data: teamData } = await supabase.from('teams').select('team_code, manager_name').eq('id', tId).single();
+          if (teamData) {
+            setTeamInfo({
+              teamCode: teamData.team_code,
+              creatorName: teamData.manager_name
+            });
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
     };
 
-    fetchStats();
-    const interval = setInterval(fetchStats, 5000);
-    return () => clearInterval(interval);
-  }, [memberId]);
+    fetchTeamInfo();
+  }, [memberId, teamId]);
+
 
   const [isExitModalVisible, setIsExitModalVisible] = useState(false);
 
@@ -115,34 +117,29 @@ export default function MemberProfile() {
           <Text className="text-slate-400 text-sm mt-2">{teamName}</Text>
         </View>
 
-        {/* Stats Grid */}
-        <Text className="text-slate-800 font-bold text-lg mb-4">Your Performance</Text>
-        <View className="flex-row gap-4 mb-6">
-          {/* Productivity */}
-          <View className="flex-1 bg-white rounded-2xl p-4 shadow-sm border border-slate-100 items-center justify-center">
-            <View className="w-10 h-10 rounded-full bg-orange-50 items-center justify-center mb-2">
-              <Feather name="target" size={18} color="#ea580c" />
+        {/* Workspace Info */}
+        <Text className="text-slate-800 font-bold text-lg mb-4">Workspace Info</Text>
+        <View className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-6">
+          <View className="flex-row items-center justify-between p-4 border-b border-slate-50">
+            <View className="flex-row items-center gap-3">
+              <View className="w-8 h-8 rounded-full bg-slate-50 items-center justify-center">
+                <Feather name="flag" size={16} color="#64748b" />
+              </View>
+              <Text className="text-slate-700 font-medium text-sm">Team Name</Text>
             </View>
-            <Text className="text-2xl font-extrabold text-slate-800 mb-1">{stats.productivityScore}%</Text>
-            <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider text-center">Score</Text>
+            <Text className="text-slate-500 font-bold">{teamName}</Text>
           </View>
 
-          {/* Completed */}
-          <View className="flex-1 bg-white rounded-2xl p-4 shadow-sm border border-slate-100 items-center justify-center">
-            <View className="w-10 h-10 rounded-full bg-emerald-50 items-center justify-center mb-2">
-              <Feather name="check-circle" size={18} color="#10b981" />
+          <View className="flex-row items-center justify-between p-4 border-b border-slate-50">
+            <View className="flex-row items-center gap-3">
+              <View className="w-8 h-8 rounded-full bg-slate-50 items-center justify-center">
+                <Feather name="hash" size={16} color="#64748b" />
+              </View>
+              <Text className="text-slate-700 font-medium text-sm">Team Code</Text>
             </View>
-            <Text className="text-2xl font-extrabold text-slate-800 mb-1">{stats.completedTasks}</Text>
-            <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider text-center">Completed</Text>
-          </View>
-
-          {/* Assigned */}
-          <View className="flex-1 bg-white rounded-2xl p-4 shadow-sm border border-slate-100 items-center justify-center">
-            <View className="w-10 h-10 rounded-full bg-indigo-50 items-center justify-center mb-2">
-              <Feather name="briefcase" size={18} color="#4f46e5" />
-            </View>
-            <Text className="text-2xl font-extrabold text-slate-800 mb-1">{stats.assignedTasks}</Text>
-            <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider text-center">Total</Text>
+            <Text className="text-slate-500 font-bold">
+              {teamInfo.teamCode || 'Loading...'} {teamInfo.creatorName ? `(Creator: ${teamInfo.creatorName})` : ''}
+            </Text>
           </View>
         </View>
 

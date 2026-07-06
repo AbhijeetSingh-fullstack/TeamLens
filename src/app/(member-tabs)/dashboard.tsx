@@ -70,7 +70,7 @@ export default function MemberDashboard() {
       const score = totalTasks > 0 ? Math.round((completedCount / totalTasks) * 100) : 0;
 
       setStats({
-        totalMembers: membersCount || 1, // Fallback to 1 (themselves)
+        totalMembers: (membersCount || 0) + 1, // Add +1 to include the manager
         assignedTasks: assignedCount,
         productivityScore: score
       });

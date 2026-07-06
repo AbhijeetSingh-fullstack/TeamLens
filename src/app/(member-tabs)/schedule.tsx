@@ -21,8 +21,10 @@ import {
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
+import { useUser } from '@clerk/clerk-expo';
 
 export default function Schedule() {
+  const { user } = useUser();
   const [memberId, setMemberId] = useState<string>('');
   const [teamId, setTeamId] = useState<string>('');
 
@@ -45,9 +47,15 @@ export default function Schedule() {
   useEffect(() => {
     const loadIds = async () => {
       let mId = memberId;
-      if (!mId) {
-        mId = await AsyncStorage.getItem('memberId') || '';
-        setMemberId(mId);
+      if (!mId && user) {
+        const memberDataStr = await AsyncStorage.getItem(`member_team_${user.id}`);
+        if (memberDataStr) {
+          try {
+            const data = JSON.parse(memberDataStr);
+            mId = data.memberId;
+            setMemberId(mId);
+          } catch(e) {}
+        }
       }
       if (mId) {
         fetchSchedules(mId);
@@ -55,8 +63,8 @@ export default function Schedule() {
         setLoading(false);
       }
     };
-    loadIds();
-  }, [currentMonth]);
+    if (user) loadIds();
+  }, [currentMonth, user]);
 
 
 

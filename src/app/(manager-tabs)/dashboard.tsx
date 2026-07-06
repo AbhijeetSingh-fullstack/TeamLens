@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, ScrollView, Image, StatusBar, Modal, TextInput, Share } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Image, StatusBar, Modal, TextInput, Share, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
@@ -7,6 +7,7 @@ import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
 import * as Clipboard from 'expo-clipboard';
+import { useUser } from '@clerk/clerk-expo';
 
 type Member = {
   id: string;
@@ -18,6 +19,7 @@ type Member = {
 
 export default function ManagerDashboard() {
   const router = useRouter();
+  const { user } = useUser();
   const { teamCode, teamName } = useLocalSearchParams<{ teamCode: string, teamName: string }>();
 
   const [stats, setStats] = useState({
@@ -41,6 +43,50 @@ export default function ManagerDashboard() {
   const [newRoleName, setNewRoleName] = useState('');
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
+
+  const [editingTeamName, setEditingTeamName] = useState('');
+  const [isUpdatingTeamName, setIsUpdatingTeamName] = useState(false);
+
+  useEffect(() => {
+    setEditingTeamName(displayTeamName);
+  }, [displayTeamName]);
+
+  const handleUpdateTeamName = async () => {
+    if (!editingTeamName.trim()) {
+      Toast.show({ type: 'error', text1: 'Error', text2: 'Team name cannot be empty.' });
+      return;
+    }
+    
+    if (editingTeamName.trim() === displayTeamName) {
+      return; // No change
+    }
+
+    setIsUpdatingTeamName(true);
+    try {
+      const { error } = await supabase
+        .from('teams')
+        .update({ team_name: editingTeamName.trim() })
+        .eq('team_code', displayTeamCode);
+
+      if (error) throw error;
+
+      setDisplayTeamName(editingTeamName.trim());
+      Toast.show({ type: 'success', text1: 'Success', text2: 'Team name updated successfully.' });
+      
+      router.setParams({ teamName: editingTeamName.trim() });
+      
+      if (user) {
+        await AsyncStorage.setItem(`manager_team_${user.id}`, JSON.stringify({
+          teamCode: displayTeamCode,
+          teamName: editingTeamName.trim(),
+        }));
+      }
+    } catch (error: any) {
+      Toast.show({ type: 'error', text1: 'Error', text2: error.message || 'Failed to update team name.' });
+    } finally {
+      setIsUpdatingTeamName(false);
+    }
+  };
 
   const handleInvite = async () => {
     const inviteMessage = `Hello,\n\nYou have been invited to join the "${displayTeamName}" workspace on TeamLens.\n\nPlease use the following secure invite code to access our workspace:\n\nTEAM CODE: ${displayTeamCode}\n\nDownload the TeamLens app to get started and begin collaborating with the team.`;
@@ -558,6 +604,31 @@ export default function ManagerDashboard() {
           </View>
 
           <ScrollView className="flex-1 px-6" showsVerticalScrollIndicator={false}>
+            {/* Edit Team Name Section */}
+            <View className="bg-white rounded-[20px] p-5 shadow-sm border border-slate-100 mb-6">
+              <Text className="text-lg font-bold text-slate-800 mb-4">Team Name</Text>
+              
+              <View className="flex-row gap-2">
+                <TextInput
+                  value={editingTeamName}
+                  onChangeText={setEditingTeamName}
+                  placeholder="Enter team name"
+                  className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800"
+                />
+                <TouchableOpacity 
+                  onPress={handleUpdateTeamName}
+                  disabled={isUpdatingTeamName}
+                  className="bg-indigo-600 px-5 rounded-xl items-center justify-center"
+                >
+                  {isUpdatingTeamName ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text className="text-white font-bold">Save</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+
             {/* Roles Section */}
             <View className="bg-white rounded-[20px] p-5 shadow-sm border border-slate-100 mb-6">
               <Text className="text-lg font-bold text-slate-800 mb-4">Team Roles</Text>
