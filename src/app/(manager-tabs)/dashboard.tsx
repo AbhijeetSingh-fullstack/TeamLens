@@ -6,6 +6,7 @@ import { supabase } from '../../utils/supabase';
 import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
+import * as Clipboard from 'expo-clipboard';
 
 type Member = {
   id: string;
@@ -42,9 +43,12 @@ export default function ManagerDashboard() {
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
 
   const handleInvite = async () => {
-    const inviteMessage = `🚀 You're invited to join my workspace "${displayTeamName}" on TeamLens!\n\nUse this secure invite code to join: ${displayTeamCode}\n\nDownload TeamLens to get started and collaborate with us.`;
+    const inviteMessage = `Hello,\n\nYou have been invited to join the "${displayTeamName}" workspace on TeamLens.\n\nPlease use the following secure invite code to access our workspace:\n\nTEAM CODE: ${displayTeamCode}\n\nDownload the TeamLens app to get started and begin collaborating with the team.`;
 
     try {
+      await Clipboard.setStringAsync(inviteMessage);
+      Toast.show({ type: 'success', text1: 'Copied to Clipboard', text2: 'Invite message copied successfully.' });
+      
       await Share.share({
         message: inviteMessage,
         title: `Join ${displayTeamName} on TeamLens`,
